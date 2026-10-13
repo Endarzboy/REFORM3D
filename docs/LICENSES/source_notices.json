@@ -1,0 +1,66 @@
+{
+  "copied_license_files": [
+    {
+      "export": "docs/LICENSES/Hi-End-MAE-LICENSE.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": "reform3d_eval/external_methods/Hi-End-MAE/LICENSE"
+    },
+    {
+      "export": "docs/LICENSES/SAM-Med3D-LICENSE.txt",
+      "sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1",
+      "source": "reform3d_eval/external_methods/SAM-Med3D/LICENSE"
+    },
+    {
+      "export": "docs/LICENSES/MambaMIM-LICENSE.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "source": "reform3d_eval/external_methods/MambaMIM/LICENSE"
+    },
+    {
+      "export": "docs/LICENSES/nnssl-LICENSE.md",
+      "sha256": "ef7ad3fea481d2f93d88a7106fca7e4c2ef5a5cd1afda6e8b151e2e720c1825d",
+      "source": "reform3d_eval/external_methods/openmind/nnssl-openneuro/LICENSE.md"
+    }
+  ],
+  "missing_local_license_records": [
+    "Med3DINO/3DINO full CC BY-NC-ND 4.0 license text referenced by source headers",
+    "MiM source license",
+    "GL-MAE source license",
+    "BrainIAC checkpoint license",
+    "VoCo checkpoint license",
+    "Med3DINO checkpoint redistribution terms"
+  ],
+  "openmind_checkpoint_model_card": {
+    "declared_license": "cc-by-4.0",
+    "sha256": "afc276456f86dd5b027fa859559eb802a7ff5e80c6797dae4dc599855822872f",
+    "source": "reform3d_eval/external_methods/openmind/PrimusM-OpenMind-VoCo/README.md"
+  },
+  "project_license": "not assigned by this export",
+  "schema_version": 1,
+  "source_headers": [
+    {
+      "header": "# Author: Tony Xu\n#\n# This code is adapted from the original DINOv2 repository: https://github.com/facebookresearch/dinov2\n# This code is licensed under the CC BY-NC-ND 4.0 license\n# found in the LICENSE file in the root directory of this source tree.\n\n# References:\n#   https://github.com/facebookresearch/dino/blob/main/vision_transformer.py\n#   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py",
+      "sha256": "b48c15c0ecba4fe56ca584dfc19d719f564d3684f9ab0a33edc7c7ad63b277e4",
+      "source": "dinov2/models/vision_transformer.py"
+    },
+    {
+      "header": "# Author: Tony Xu\n#\n# This code is adapted from the original DINOv2 repository: https://github.com/facebookresearch/dinov2\n# This code is licensed under the CC BY-NC-ND 4.0 license\n# found in the LICENSE file in the root directory of this source tree.",
+      "sha256": "492426f1ea762e1d4cc46d63aae2c6c775312159c4de42d56b9c3df37f694286",
+      "source": "dinov2/layers/patch_embed3d.py"
+    },
+    {
+      "header": "# Copyright (c) Meta Platforms, Inc. and affiliates.\n#\n# This source code is licensed under the Apache License, Version 2.0\n# found in the LICENSE file in the root directory of this source tree.\n\n# References:\n#   https://github.com/facebookresearch/dino/blob/master/vision_transformer.py\n#   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py",
+      "sha256": "069849572d7a102a7a226294e2e1af2b79e73833bbae41d115791a7f83cd4839",
+      "source": "dinov2/layers/attention.py"
+    },
+    {
+      "header": "# Author: Tony Xu\n#\n# This code is adapted from the original DINOv2 repository: https://github.com/facebookresearch/dinov2\n# This code is licensed under the CC BY-NC-ND 4.0 license\n# found in the LICENSE file in the root directory of this source tree.",
+      "sha256": "d16bacb01d75677a95d44029c12b2b1438f8a8312a55fe8547b2c8c1126ac7bd",
+      "source": "dinov2/train/train3d.py"
+    },
+    {
+      "header": "# Author: Tony Xu\n#\n# This code is adapted from the original DINOv2 repository: https://github.com/facebookresearch/dinov2\n# This code is licensed under the CC BY-NC-ND 4.0 license\n# found in the LICENSE file in the root directory of this source tree.",
+      "sha256": "9d28d0ebe40620ba21e6898ee3166783c57e2d204d1f96a016ab8ad721bbce29",
+      "source": "dinov2/data/augmentations.py"
+    }
+  ]
+}

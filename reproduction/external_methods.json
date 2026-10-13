@@ -1,0 +1,224 @@
+{
+  "comparability": "Independent pretrained references differ in architecture, data, objectives, input size and feature interfaces; only ISO/REL/SA are the controlled geometric comparison.",
+  "evidence": "local runtime constants and local source notices; download URLs are unresolved unless recorded explicitly",
+  "methods": [
+    {
+      "checkpoint_bytes": 362119240,
+      "checkpoint_file": "BrainIAC.ckpt",
+      "checkpoint_key": "brainiac",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "f22bdbcae26823a9d9e8aee883c6f24386ba4617339c12269848b6666cc62693",
+      "crop_size": 96,
+      "download_url": null,
+      "feature_surfaces": {
+        "avg_pool": "final_patch_token_average",
+        "cls": "first_final_patch_token_legacy_cls_label",
+        "multilayer": "last_four_layer_first_token_concat"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "data:///med3dino/external_methods_checkpoints/brainiac/checkpoints/BrainIAC.ckpt",
+      "method": "brainiac",
+      "model_name": "BrainIAC",
+      "primary_feature": "cls",
+      "reported_checkpoint_sha256": null,
+      "reported_hash_matches": null,
+      "reported_source_commit": null,
+      "source": "reform3d_eval/external_methods/brainiac/runtime.py",
+      "source_sha256": "65b7c474ea481e3bb4662708db85e8ed36c28a1c2aa1c333c7e4262228e300e6",
+      "supported_features": [
+        "cls",
+        "avg_pool",
+        "multilayer"
+      ]
+    },
+    {
+      "checkpoint_bytes": 700581626,
+      "checkpoint_file": "checkpoint_final.pth",
+      "checkpoint_key": "openmind_primusm_voco",
+      "checkpoint_license": "cc-by-4.0 as declared in inspected local model card; source notice hash in docs/LICENSES/source_notices.json",
+      "checkpoint_sha256": "9fd7fb5f4af86a18940e013b5f2616ca64a60e7a62f1b4b8d9fc8004432a5e9f",
+      "crop_size": 64,
+      "download_url": null,
+      "feature_surfaces": {
+        "avg_pool": "encoder_avg_pool",
+        "projected": "mean_token_projector_head"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "data:///med3dino/external_methods_checkpoints/openmind/checkpoints/checkpoint_final.pth",
+      "method": "openmind",
+      "model_name": "OpenMind PrimusM VoCo",
+      "primary_feature": "avg_pool",
+      "published_config_asset": {
+        "path": "src/reform3d/external_methods/openmind/PrimusM-OpenMind-VoCo/adaptation_plan.json",
+        "sha256": "371d3011c6aae0b7d024ff2a42cce550bfbf6ff04596db945215cb646fe5f6aa"
+      },
+      "reported_checkpoint_sha256": null,
+      "reported_hash_matches": null,
+      "reported_source_commit": null,
+      "source": "reform3d_eval/external_methods/openmind/runtime.py",
+      "source_runtime_requirement": "REFORM3D_OPENMIND_SOURCE_ROOT: external nnssl-openneuro/src; source checkout is not bundled",
+      "source_sha256": "42915e92e9902c4d560cf3c5b71534b21aa2afd4468c05c2a536b1ccd35a5990",
+      "supported_features": [
+        "avg_pool",
+        "projected"
+      ]
+    },
+    {
+      "checkpoint_bytes": 220245988,
+      "checkpoint_file": "VoCo_B_SSL_head.pt",
+      "checkpoint_key": "voco_b_ssl_head",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "06664b629e73a25aacfaf9e0dd3f2df36f93a9f60f0bf8cf4d8b5cc95cd01298",
+      "crop_size": 96,
+      "download_url": null,
+      "feature_surfaces": {
+        "final_stage_pool": "final_stage_encoder_pool",
+        "pooled_multiscale": "pooled_multiscale_encoder_descriptor"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "data:///med3dino/external_methods_checkpoints/voco/checkpoints/VoCo_B_SSL_head.pt",
+      "method": "voco",
+      "model_name": "VoCo B SSL Head",
+      "primary_feature": "pooled_multiscale",
+      "reported_checkpoint_sha256": null,
+      "reported_hash_matches": null,
+      "reported_source_commit": null,
+      "source": "reform3d_eval/external_methods/voco/runtime.py",
+      "source_sha256": "27df74c110bcbd9ab6aa71f3207850c7dcd907f54d099d895166acacd3375e11",
+      "supported_features": [
+        "pooled_multiscale",
+        "final_stage_pool"
+      ]
+    },
+    {
+      "checkpoint_bytes": 402163626,
+      "checkpoint_file": "sam_med3d_turbo.pth",
+      "checkpoint_key": "sam_med3d_turbo",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "899a46d04d3b70f723282ceb489149373558bf0aaba389a346f5ab57da5cdd3c",
+      "crop_size": 128,
+      "download_url": null,
+      "feature_surfaces": {
+        "avg_pool": "official_image_encoder_post_neck_spatial_average"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "source:///reform3d_eval/external_methods/SAM-Med3D/checkpoint/sam_med3d_turbo.pth",
+      "method": "sam_med3d",
+      "model_name": "SAM-Med3D-turbo",
+      "primary_feature": "avg_pool",
+      "reported_checkpoint_sha256": "899a46d04d3b70f723282ceb489149373558bf0aaba389a346f5ab57da5cdd3c",
+      "reported_hash_matches": true,
+      "reported_source_commit": "f3de1fa10da98e46f49f176773d2b1e306ba131f",
+      "source": "reform3d_eval/external_methods/sam_med3d/runtime.py",
+      "source_sha256": "253e5fa5edd73c75d649d3f498693d966511608121a33f02cbe8327859e8fbe7",
+      "supported_features": [
+        "avg_pool"
+      ]
+    },
+    {
+      "checkpoint_bytes": 1471994919,
+      "checkpoint_file": "hi_end_mae_10k.pth",
+      "checkpoint_key": "hi_end_mae_vit_p12_1536",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "549994dd1e0cf3bbe6cd2ecc604a0457178ea033f9f3ce14376b5dd994dc98b5",
+      "crop_size": 96,
+      "download_url": null,
+      "feature_surfaces": {
+        "cls": "official_encoder_final_normalized_cls_token"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "source:///reform3d_eval/external_methods/Hi-End-MAE/checkpoint/hi_end_mae_10k.pth",
+      "method": "hi_end_mae",
+      "model_name": "Hi-End-MAE ViT-p12/1536",
+      "primary_feature": "cls",
+      "reported_checkpoint_sha256": "549994dd1e0cf3bbe6cd2ecc604a0457178ea033f9f3ce14376b5dd994dc98b5",
+      "reported_hash_matches": true,
+      "reported_source_commit": "b0df9c6e6cc86bfff5b6e83beb4ea6a2e9f39b1c",
+      "source": "reform3d_eval/external_methods/hi_end_mae/runtime.py",
+      "source_sha256": "42575657c275133082bdbcf28e96a7aa5af82c85a4e5be3fcb19ad8b17b87c2a",
+      "supported_features": [
+        "cls"
+      ]
+    },
+    {
+      "checkpoint_bytes": 90976893,
+      "checkpoint_file": "mambamim_mask75.pth",
+      "checkpoint_key": "mambamim_mask75",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "fd92f6cfdd2aff93f8942536f333bca7eb612b4238153c9b5accbacd9e4e1989",
+      "crop_size": 96,
+      "download_url": null,
+      "feature_surfaces": {
+        "final_stage_pool": "official_dense_encoder_final_stage_spatial_average"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "source:///reform3d_eval/external_methods/MambaMIM/checkpoint/mambamim_mask75.pth",
+      "method": "mambamim",
+      "model_name": "MambaMIM",
+      "primary_feature": "final_stage_pool",
+      "reported_checkpoint_sha256": "fd92f6cfdd2aff93f8942536f333bca7eb612b4238153c9b5accbacd9e4e1989",
+      "reported_hash_matches": true,
+      "reported_source_commit": "59e9ddafc24507cfa0a365f4eb5ff426fd4cbd24",
+      "source": "reform3d_eval/external_methods/mambamim/runtime.py",
+      "source_sha256": "678b6545599e544ec9b423eedc163c5b7b3b5b28be8dfeec1499450501e72b5e",
+      "supported_features": [
+        "final_stage_pool"
+      ]
+    },
+    {
+      "archive_weight_member": "ckpts/checkpoint-final.pth",
+      "checkpoint_bytes": 821926913,
+      "checkpoint_file": "checkpoint-final.pth",
+      "checkpoint_key": "mim_convvit_base",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "919e7174b6d22c198cafe494be5902ba678fc9179e6303d8413fc5dd6b003e65",
+      "container_sha256": "67fe853151bd46014982d9169870470ba18ae71063b42a804b0c90afcc77c737",
+      "crop_size": 96,
+      "download_url": null,
+      "feature_surfaces": {
+        "avg_pool": "deterministic_unmasked_final_encoder_token_average"
+      },
+      "hash_scope": "checkpoint_sha256 hashes the decompressed weight member; published runtime constant hashes the ZIP container",
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "source:///reform3d_eval/external_methods/MiM/checkpoint/ckpts.zip",
+      "method": "mim",
+      "model_name": "MiM ConvViT-B",
+      "primary_feature": "avg_pool",
+      "reported_checkpoint_sha256": "67fe853151bd46014982d9169870470ba18ae71063b42a804b0c90afcc77c737",
+      "reported_hash_matches": true,
+      "reported_hash_scope": "zip_container",
+      "reported_source_commit": "f6c949d1e5c1df8627365a9ae9c1cdf4ee8f6019",
+      "source": "reform3d_eval/external_methods/mim/runtime.py",
+      "source_sha256": "de7d42614f35cb2b8201afabf3754088ce960e0618f0b6df5eec79862260ecdb",
+      "supported_features": [
+        "avg_pool"
+      ]
+    },
+    {
+      "checkpoint_bytes": 1939504873,
+      "checkpoint_file": "checkpoint-1599.pth",
+      "checkpoint_key": "gl_mae_vit_base_patch16",
+      "checkpoint_license": "unresolved_from_local_evidence",
+      "checkpoint_sha256": "88b637598b816dbc097fc92757c1d39b0b734a1c666a58ec504d34bf882c7a5e",
+      "crop_size": 96,
+      "download_url": null,
+      "feature_surfaces": {
+        "cls": "official_encoder_final_normalized_cls_token"
+      },
+      "local_checkpoint_exists": true,
+      "local_checkpoint_location": "source:///reform3d_eval/external_methods/GL-MAE/checkpoint/checkpoint-1599.pth",
+      "method": "gl_mae",
+      "model_name": "GL-MAE ViT-B/16",
+      "primary_feature": "cls",
+      "reported_checkpoint_sha256": "88b637598b816dbc097fc92757c1d39b0b734a1c666a58ec504d34bf882c7a5e",
+      "reported_hash_matches": true,
+      "reported_source_commit": "44cd68d6d60278a7ef25dc388f4b79704a677d4b",
+      "source": "reform3d_eval/external_methods/gl_mae/runtime.py",
+      "source_sha256": "521032d5039b5e29999799c21642e78d37b06b5d27512d3b978b7d357cb8730c",
+      "supported_features": [
+        "cls"
+      ]
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,12 @@
+dataset: mmwhs_ct_mr
+data_root: /path/to/mm_whs
+checkpoint_root: /path/to/checkpoints
+checkpoints: [med3dino_rel_96, med3dino_sa_96]
+workspace: ../workspace
+run_name: mmwhs-demo
+preset: demo
+seeds: [42]
+feature_types: [cls]
+device: cuda:0
+batch_size: 1
+workers: 2

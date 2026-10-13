@@ -1,0 +1,701 @@
+{
+  "schema_version": 1,
+  "purpose": "Frozen encoder runtime export; no pretraining import dependency.",
+  "med3dino": [
+    {
+      "source": "dinov2/models/vision_transformer.py",
+      "destination": "src/reform3d/encoders/med3dino/vision_transformer.py",
+      "source_sha256": "b48c15c0ecba4fe56ca584dfc19d719f564d3684f9ab0a33edc7c7ad63b277e4",
+      "export_sha256": "58498beebd79a20b769a2b7c2a45668b7cca8e6ed12c6964214f0bb5ac3a7bc1",
+      "changes": "import namespace only"
+    },
+    {
+      "source": "dinov2/layers/mlp.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/mlp.py",
+      "source_sha256": "255825c73b60a916dd00eb1e38aacbcdbf316e40d6a005efb46e245b7edb43aa",
+      "export_sha256": "255825c73b60a916dd00eb1e38aacbcdbf316e40d6a005efb46e245b7edb43aa",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/patch_embed.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/patch_embed.py",
+      "source_sha256": "40da6add3d811198ea3e17cb99cdd4e5cda59e369efbbe3d18d89308618cf142",
+      "export_sha256": "40da6add3d811198ea3e17cb99cdd4e5cda59e369efbbe3d18d89308618cf142",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/patch_embed3d.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/patch_embed3d.py",
+      "source_sha256": "492426f1ea762e1d4cc46d63aae2c6c775312159c4de42d56b9c3df37f694286",
+      "export_sha256": "492426f1ea762e1d4cc46d63aae2c6c775312159c4de42d56b9c3df37f694286",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/swiglu_ffn.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/swiglu_ffn.py",
+      "source_sha256": "9db549c04b4e72e96af7f324d984a0a3a1b3393027651cc50dff4f724244e8fc",
+      "export_sha256": "9db549c04b4e72e96af7f324d984a0a3a1b3393027651cc50dff4f724244e8fc",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/block.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/block.py",
+      "source_sha256": "04f331a89f4921dbee36a5bc086b5f28e466c01de541cc18a6f1df4886b0bb2b",
+      "export_sha256": "04f331a89f4921dbee36a5bc086b5f28e466c01de541cc18a6f1df4886b0bb2b",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/attention.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/attention.py",
+      "source_sha256": "069849572d7a102a7a226294e2e1af2b79e73833bbae41d115791a7f83cd4839",
+      "export_sha256": "069849572d7a102a7a226294e2e1af2b79e73833bbae41d115791a7f83cd4839",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/drop_path.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/drop_path.py",
+      "source_sha256": "b9f8236e86054b9d9a71275efcad2a9ecaa1f86b529d4b8d6109ddb5e806f67a",
+      "export_sha256": "b9f8236e86054b9d9a71275efcad2a9ecaa1f86b529d4b8d6109ddb5e806f67a",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/layers/layer_scale.py",
+      "destination": "src/reform3d/encoders/med3dino/layers/layer_scale.py",
+      "source_sha256": "abb7bbfae152a9de2e6d0961ab5e75c79428e849281bfe50dd07b66b54b485d1",
+      "export_sha256": "abb7bbfae152a9de2e6d0961ab5e75c79428e849281bfe50dd07b66b54b485d1",
+      "changes": "none"
+    },
+    {
+      "source": "dinov2/data/spacing_aware_transforms.py",
+      "destination": "src/reform3d/encoders/med3dino/spacing_aware_transforms.py",
+      "source_sha256": "3df7fd9f3a52302e95432509d02bac25f4ab0815f88898a71ace5cbe7841e784",
+      "export_sha256": "3df7fd9f3a52302e95432509d02bac25f4ab0815f88898a71ace5cbe7841e784",
+      "changes": "none"
+    }
+  ],
+  "validation": {
+    "status": "core_runtime_checks_passed_optional_external_backends_incomplete",
+    "synthetic_runtime_parity": {
+      "status": "passed",
+      "torch": "2.4.0+cu121",
+      "scope": "CPU synthetic architecture/transform parity; no paper result rerun",
+      "encoder_fixtures": [
+        {
+          "shape": [
+            2,
+            1,
+            16,
+            16,
+            16
+          ],
+          "masked": false
+        },
+        {
+          "shape": [
+            2,
+            1,
+            16,
+            16,
+            16
+          ],
+          "masked": true
+        },
+        {
+          "shape": [
+            2,
+            1,
+            16,
+            12,
+            8
+          ],
+          "masked": false
+        },
+        {
+          "shape": [
+            2,
+            1,
+            16,
+            12,
+            8
+          ],
+          "masked": true
+        }
+      ],
+      "intermediate_layers": 2,
+      "max_absolute_difference": 0.0,
+      "foreground_spacing_fixtures": [
+        [
+          1,
+          1,
+          1
+        ],
+        [
+          5,
+          1,
+          1
+        ],
+        [
+          1,
+          4,
+          1
+        ],
+        [
+          1,
+          1,
+          3
+        ]
+      ]
+    },
+    "optional_external_sources": {
+      "mim": {
+        "status": "source_import_passed"
+      },
+      "gl_mae": {
+        "status": "source_import_passed"
+      },
+      "mambamim": {
+        "status": "unavailable",
+        "type": "RuntimeError",
+        "error": "MambaMIM requires its dedicated environment with mamba_ssm and causal_conv1d installed"
+      },
+      "sam_med3d": {
+        "status": "source_import_passed"
+      },
+      "openmind": {
+        "status": "configured_source_required",
+        "blockers": [
+          "Required upstream source is missing: repo://src/reform3d/external_methods/openmind/nnssl-openneuro/src/nnssl/architectures/get_network_by_name.py. Set this method's REFORM3D_<METHOD>_SOURCE_ROOT to its documented source directory.",
+          "OpenMind nnssl source tree not found: repo://src/reform3d/external_methods/openmind/nnssl-openneuro/src",
+          "Missing nnssl model loader: No module named 'nnssl'",
+          "Missing nnssl VoCo architecture: No module named 'nnssl'"
+        ]
+      }
+    },
+    "negative_path_checks": {
+      "known_unused_head": "passed",
+      "missing_encoder": "passed",
+      "unexpected_encoder": "passed",
+      "shape_mismatch": "passed",
+      "complete_ids": "passed",
+      "missing_ids": "passed",
+      "duplicate_ids": "passed",
+      "unexpected_ids": "passed",
+      "extraction_error": "passed",
+      "external_source_collision": "passed",
+      "semantic_label_failure": "passed"
+    },
+    "standalone_runtime_imports": {
+      "status": "passed",
+      "module_count": 12,
+      "source_checkout_on_pythonpath": false
+    },
+    "cpu_extractor_regression": {
+      "status": "passed",
+      "test_file": "tests/test_cpu_feature_extraction.py",
+      "tests": 5,
+      "scope": "Tiny 3D encoder and checkpoint; CPU constructor defaults/device override, cls/avg_pool/multilayer exact float32 parity, malformed input rejection, no CUDA autocast; CUDA default dtype retained."
+    }
+  },
+  "license_headers_preserved": true,
+  "external_sources": [
+    {
+      "source": "reform3d_eval/external_methods/MiM/Pretrain/vision_transformer.py",
+      "destination": "src/reform3d/external_methods/MiM/Pretrain/vision_transformer.py",
+      "source_sha256": "462cc16245ac3f3e515fed9d971f16240cef937c7521989e784ec7328d575c3e",
+      "export_sha256": "462cc16245ac3f3e515fed9d971f16240cef937c7521989e784ec7328d575c3e",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/GL-MAE/Finetune/models_3dvit.py",
+      "destination": "src/reform3d/external_methods/GL-MAE/Finetune/models_3dvit.py",
+      "source_sha256": "a43f302454dce92bfc9d1fd435b85adcb7fbbd01834a93c6a4df098817318026",
+      "export_sha256": "a43f302454dce92bfc9d1fd435b85adcb7fbbd01834a93c6a4df098817318026",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/MambaMIM/models/__init__.py",
+      "destination": "src/reform3d/external_methods/MambaMIM/models/__init__.py",
+      "source_sha256": "4f70b8ea2aa1202845464e9a491d65f32afe7eb34afd3754fb5281e016f0cbe7",
+      "export_sha256": "b737e76886d1d54316997558d0b10308a28541dd424edbd0c10e6518a77fc52f",
+      "changes": "inference-only package initializer; remove unused training/timm registration imports"
+    },
+    {
+      "source": "reform3d_eval/external_methods/MambaMIM/models/encoder.py",
+      "destination": "src/reform3d/external_methods/MambaMIM/models/encoder.py",
+      "source_sha256": "660ecf271fc9f2d347a106d6981207b9b47720647f426a7cb195f64434ece0db",
+      "export_sha256": "660ecf271fc9f2d347a106d6981207b9b47720647f426a7cb195f64434ece0db",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/MambaMIM/models/mamba/bi_vision_mamba.py",
+      "destination": "src/reform3d/external_methods/MambaMIM/models/mamba/bi_vision_mamba.py",
+      "source_sha256": "5494884b36a6f5592fe208565436d0b57e0ca9cebca8b87d17ba447908e39036",
+      "export_sha256": "5494884b36a6f5592fe208565436d0b57e0ca9cebca8b87d17ba447908e39036",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/MambaMIM/models/network/hymamba.py",
+      "destination": "src/reform3d/external_methods/MambaMIM/models/network/hymamba.py",
+      "source_sha256": "800d4934584b86efa12d131713e9f120ce665383497aebca3501be9d11d89307",
+      "export_sha256": "800d4934584b86efa12d131713e9f120ce665383497aebca3501be9d11d89307",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/__init__.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/__init__.py",
+      "source_sha256": "fea784cd5e8982e3dcc83cc68381194bd7f9ec80ca30727738604d39eaead3f9",
+      "export_sha256": "fea784cd5e8982e3dcc83cc68381194bd7f9ec80ca30727738604d39eaead3f9",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/automatic_mask_generator.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/automatic_mask_generator.py",
+      "source_sha256": "6f0b2fd2352d8c548331fd038addcce3e0469ed510066de108c847a79e4aa11e",
+      "export_sha256": "e76e9dcbc1edc118aaa9ef5fb14915cc29a3fd4f06f31c5634e0abc34972f9a4",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/build_sam.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/build_sam.py",
+      "source_sha256": "8f432850d5be92697f6fdc4aa706aec7e3731a0e7489650e2ecc247b0448bfee",
+      "export_sha256": "c5ff3e4983fe542eb65ccdfffe9d24ce84b4ca76916afe0f61e29215bb743398",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/build_sam3D.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/build_sam3D.py",
+      "source_sha256": "53178647d1bc4f7482733a3c27349ca4ded84e891314fb366a9b95d0b75368b9",
+      "export_sha256": "53178647d1bc4f7482733a3c27349ca4ded84e891314fb366a9b95d0b75368b9",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/__init__.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/__init__.py",
+      "source_sha256": "d09f8509bb10509d4613a9b0f1d528300295ab77e9267b3e047db228bcdddb7d",
+      "export_sha256": "d09f8509bb10509d4613a9b0f1d528300295ab77e9267b3e047db228bcdddb7d",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/common.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/common.py",
+      "source_sha256": "6290c9d1a1c548bed5a4c7ff5861f88d881658a96bf630d5a65f9977d1bacdf2",
+      "export_sha256": "6058d0b93eb6b3f1b278bfc20d1041772d20f9ff1c69b652edfab90f6d99abf0",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/image_encoder.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/image_encoder.py",
+      "source_sha256": "f5f87b35b775779dcfc0d2ed629cbf3e449150de627a0ddbcde37c46d739412b",
+      "export_sha256": "b91bbe50676094bac903fef515d7bc5db8399329e97a9f3f3d64abae5c4fb9a0",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/image_encoder3D.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/image_encoder3D.py",
+      "source_sha256": "4d2ce9b5633dd71f228900a61b040cf35456c3c7bb6e028b02009cdabbaa0a3f",
+      "export_sha256": "4d2ce9b5633dd71f228900a61b040cf35456c3c7bb6e028b02009cdabbaa0a3f",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/mask_decoder.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/mask_decoder.py",
+      "source_sha256": "37a62400d3de67972783e3ef04e786573c18c5bc5d0b94d3b33e1bb515cdea48",
+      "export_sha256": "b5cb73a4bdc52183418fac61065c5afb83117b6ec3e26da2538a8a3f2c688b4e",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/mask_decoder3D.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/mask_decoder3D.py",
+      "source_sha256": "c32d5255d14adb4ff2fa80480f8b6a090352d48f11b2347519688375ef0bb80f",
+      "export_sha256": "c32d5255d14adb4ff2fa80480f8b6a090352d48f11b2347519688375ef0bb80f",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/prompt_encoder.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/prompt_encoder.py",
+      "source_sha256": "f25dba8a7c0ccc459dadf1fa6cb2d67467a74b4d959305de423eebf6135de182",
+      "export_sha256": "83cf6fca1ac750c48cf3b3bdef89f6f1714e6eb04be8474d6fd2e9f6fba10cea",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/prompt_encoder3D.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/prompt_encoder3D.py",
+      "source_sha256": "e0a42f28028d4af48d1ce3b26c70ab2bebb5a82d678232aeed66440115defccf",
+      "export_sha256": "e0a42f28028d4af48d1ce3b26c70ab2bebb5a82d678232aeed66440115defccf",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/sam3D.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/sam3D.py",
+      "source_sha256": "ee5293c90c2093139e7fcd1f791de4310871c091dc61b54bd50bdef849436938",
+      "export_sha256": "ee5293c90c2093139e7fcd1f791de4310871c091dc61b54bd50bdef849436938",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/sam_model.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/sam_model.py",
+      "source_sha256": "4d8473585477e8cce3a34f0548235dc6c46dec22677a08d0e1f8e5237dcd264e",
+      "export_sha256": "348de314bfd33c7124f568b1026e2d6407e3069ac0c2eabf4a19f93e639709e9",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/transformer.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/transformer.py",
+      "source_sha256": "62d3ded020a7e39c3466ebc564fb753826da4d8a1d45a0f88e8516bb84f914e6",
+      "export_sha256": "fe9b3ce9e7b333d8b9525bee763f640f8bbb7209fb93b89c6cf144000c904cb4",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/predictor.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/predictor.py",
+      "source_sha256": "913f1bc96bc70ff9cf28f8a3ee9ed8a672f78dafe08ea10d72cf763f033e8ad4",
+      "export_sha256": "c583835ff6fe167ff6b627565aebd550404f4849cbc6867cefd91f46a0107eb4",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/utils/__init__.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/utils/__init__.py",
+      "source_sha256": "d4b779cd737a0035c7706be75cd79872e9cc49239015e595d6ec1d35aa6a9ba1",
+      "export_sha256": "d4b779cd737a0035c7706be75cd79872e9cc49239015e595d6ec1d35aa6a9ba1",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/utils/amg.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/utils/amg.py",
+      "source_sha256": "e8052a4b2aef914269b99a8aace07eceda7cc90eacf8e092080172ad1180c92c",
+      "export_sha256": "e085342588fbfc47c7ea56e1aa93f50360bfb7d89e35c66d07c2349eb361d1e6",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/utils/transforms.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/utils/transforms.py",
+      "source_sha256": "bf227fe58788aae63de232b438bfe9c985941d676d20fc4f2cd86cd8d1e37ba2",
+      "export_sha256": "94943f6a8f5e5aa580c172c690dc260702c9126dc907d4def80b45fc7396d652",
+      "changes": "line-ending normalization"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/utils/transforms3D.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/utils/transforms3D.py",
+      "source_sha256": "33be72395fe5d6964b690bbf00f315701f142ccaabebd4b9ea1435772120cf78",
+      "export_sha256": "33be72395fe5d6964b690bbf00f315701f142ccaabebd4b9ea1435772120cf78",
+      "changes": "none"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/utils/__init__.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/utils/__init__.py",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "export_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changes": "none"
+    }
+  ],
+  "external_assets": [
+    {
+      "source": "reform3d_eval/external_methods/openmind/PrimusM-OpenMind-VoCo/adaptation_plan.json",
+      "destination": "src/reform3d/external_methods/openmind/PrimusM-OpenMind-VoCo/adaptation_plan.json",
+      "sha256": "371d3011c6aae0b7d024ff2a42cce550bfbf6ff04596db945215cb646fe5f6aa"
+    }
+  ],
+  "external_source_configuration": {
+    "mim": "REFORM3D_MIM_SOURCE_ROOT (optional override; one inference source is bundled)",
+    "gl_mae": "REFORM3D_GL_MAE_SOURCE_ROOT (optional override; model source is bundled)",
+    "sam_med3d": "REFORM3D_SAM_MED3D_SOURCE_ROOT (optional override; inference package is bundled)",
+    "mambamim": "REFORM3D_MAMBAMIM_SOURCE_ROOT (optional override; inference sources are bundled; dedicated compiled dependencies required)",
+    "openmind": "REFORM3D_OPENMIND_SOURCE_ROOT must point to the pinned nnssl-openneuro/src directory; dedicated environment required",
+    "hi_end_mae": "Runtime is implemented in external_methods/hi_end_mae/runtime.py; no upstream source import"
+  },
+  "excluded_copied_training_files": [
+    "src/reform3d/external_methods/MiM/Finetune/trainer.py",
+    "src/reform3d/external_methods/MiM/Finetune/main_finetune_segmentation.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/vit.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/UNet_GVSL.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/MiT_encoder.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/models_3dvit.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/unetr.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/__init__.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/pcrlv2_model_3d.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/swin.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/genesis_unet3d.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/MiT.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/model_genesis_unet3d.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/pcrl_model_3d.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/net.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/simMIM/swin_unetr.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/simMIM/__init__.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/simMIM/patchembedding.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/simMIM/mlp_new.py",
+    "src/reform3d/external_methods/MiM/Finetune/networks/simMIM/swin_unetr_og.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/default_arguments.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/metric.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/trace_utils.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/__init__.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/loss.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/helper.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/misc.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/downstream_utils.py",
+    "src/reform3d/external_methods/MiM/Finetune/utils/downstream_data_utils.py",
+    "src/reform3d/external_methods/MiM/Finetune/optimizers/__init__.py",
+    "src/reform3d/external_methods/MiM/Finetune/optimizers/lr_scheduler.py",
+    "src/reform3d/external_methods/MiM/Pretrain/models_convmae3d_v4.py",
+    "src/reform3d/external_methods/MiM/Pretrain/models_convvit3d_cls.py",
+    "src/reform3d/external_methods/MiM/Pretrain/models_mae.py",
+    "src/reform3d/external_methods/MiM/Pretrain/engine_pretrain.py",
+    "src/reform3d/external_methods/MiM/Pretrain/models_3dvit.py",
+    "src/reform3d/external_methods/MiM/Pretrain/models_vit.py",
+    "src/reform3d/external_methods/MiM/Pretrain/unetr.py",
+    "src/reform3d/external_methods/MiM/Pretrain/models_convvit3d_seg.py",
+    "src/reform3d/external_methods/MiM/Pretrain/trainer.py",
+    "src/reform3d/external_methods/MiM/Pretrain/main_pretrain.py",
+    "src/reform3d/external_methods/MiM/Pretrain/generate_cache_files.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/get_models.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/segrenset_encoder.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/unetr.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/convvit3d_unetr.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/unetr_cp.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/HPM/models_mae_learn_loss.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/HPM/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/simMIM/vision_transformer.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/simMIM/swin_transformer.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/simMIM/swin_transformer_3d.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/simMIM/build.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/simMIM/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/simMIM/simmim_advanced.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/GVSL/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/GVSL/GVSL.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/GVSL/STN.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/MoCoV2/builder.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/MoCoV2/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/SwinUNETR/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/SwinUNETR/ssl_head.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/Adam/builder.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/localMIM/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/networks/localMIM/localMIM_models_mim.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/dataloader.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/data_utils.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/default_arguments.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/metric.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/data_utils_slurm.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/loss.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/data_utils_231203.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/helper.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/lr_sched.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/misc.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/downstream_utils.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/downstream_data_utils.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/MAE/trace_utils.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/MAE/helpers.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/MAE/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/MAE/patch_embed.py",
+    "src/reform3d/external_methods/MiM/Pretrain/utils/MAE/pos_embed.py",
+    "src/reform3d/external_methods/MiM/Pretrain/optimizers/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/optimizers/lr_scheduler.py",
+    "src/reform3d/external_methods/MiM/Pretrain/losses/adam.py",
+    "src/reform3d/external_methods/MiM/Pretrain/losses/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/losses/GVSL.py",
+    "src/reform3d/external_methods/MiM/Pretrain/losses/SwinUNETR.py",
+    "src/reform3d/external_methods/MiM/Pretrain/dataloaders/adam.py",
+    "src/reform3d/external_methods/MiM/Pretrain/dataloaders/__init__.py",
+    "src/reform3d/external_methods/MiM/Pretrain/dataloaders/simMIM.py",
+    "src/reform3d/external_methods/MiM/Pretrain/dataloaders/GVSL.py",
+    "src/reform3d/external_methods/MiM/Pretrain/dataloaders/HPM.py",
+    "src/reform3d/external_methods/MiM/Pretrain/dataloaders/SwinUNETR.py",
+    "src/reform3d/external_methods/MambaMIM/dist.py",
+    "src/reform3d/external_methods/MambaMIM/main.py",
+    "src/reform3d/external_methods/MambaMIM/utils/lr_control.py",
+    "src/reform3d/external_methods/MambaMIM/utils/sampler.py",
+    "src/reform3d/external_methods/MambaMIM/utils/arg_util.py",
+    "src/reform3d/external_methods/MambaMIM/utils/lamb.py",
+    "src/reform3d/external_methods/MambaMIM/utils/misc.py",
+    "src/reform3d/external_methods/MambaMIM/utils/med_dataset.py",
+    "src/reform3d/external_methods/MambaMIM/models/MambaMIM.py",
+    "src/reform3d/external_methods/MambaMIM/models/decoder.py",
+    "src/reform3d/external_methods/SAM-Med3D/medim_val_single.py",
+    "src/reform3d/external_methods/SAM-Med3D/train.py",
+    "src/reform3d/external_methods/SAM-Med3D/medim_val_dataset.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/click_method.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/data_paths.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/prepare_data_from_nnUNet.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/infer_utils.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/metric_utils.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/data_loader.py",
+    "src/reform3d/external_methods/SAM-Med3D/utils/compute_dataset_metrics.py",
+    "src/reform3d/external_methods/Hi-End-MAE/hi_end_mae.py",
+    "src/reform3d/external_methods/Hi-End-MAE/main.py",
+    "src/reform3d/external_methods/Hi-End-MAE/trainer.py",
+    "src/reform3d/external_methods/Hi-End-MAE/networks/vit.py",
+    "src/reform3d/external_methods/Hi-End-MAE/utils/pos_embed.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/main.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/trainer.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/factory.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/utils/data_utils.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/utils/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/utils/utils.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/optimizers/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/optimizers/lr_scheduler.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/TransVW/ynet3d.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/TransVW/models/ynet3d.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/ModelsGenesis/unet3d.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/UNETR/unetr.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/UniMiSS/MiT_encoder.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/UniMiSS/utils.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/UniMiSS/MiT.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/SparK/encoder.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/SparK/mednext_spark.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/HySparK/hybird3.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/HySparK/encoder.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/default_params.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/pretrained.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/blocks.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/fpn.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/functional/segmentation.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/functional/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/functional/patches.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/functional/fpn.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/nn/functional/misc.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/utils/split.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/utils/data.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/utils/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/utils/misc.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/utils/box.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/segmentation.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/rescale.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/ct.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/patches.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/intensities.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/cropping.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/processing/orientation.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/eval/probing.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/eval/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/eval/btcv.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/eval/end_to_end.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/eval/online_probing.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/eval/predict.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/pretrain/model.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/pretrain/data.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/vox2vec/pretrain/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/GVSL/UNet_GVSL.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/GVSL/STN.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/PCRLv2/__init__.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/PCRLv2/pcrlv2_model.py",
+    "src/reform3d/external_methods/Hi-End-MAE/downstream/models/PCRLv2/pcrlv2_model_3d.py",
+    "src/reform3d/external_methods/Hi-End-MAE/dataloader/med_datasets.py"
+  ],
+  "modified_evaluation_sources": [
+    {
+      "source": "reform3d_eval/modules/acquisition_robustness/feature_extractor.py",
+      "destination": "src/reform3d/modules/acquisition_robustness/feature_extractor.py",
+      "source_sha256": "1f26238a8941e120a8e6b3a5cb82b41923d9c3f341aab3535e3d8531480b4ac6",
+      "export_sha256": "498e98d77c0c5f40e19d6a499afa2aceaa8fc9b69ff3dc09fd222aa67920e774",
+      "current_audit": "audit.json"
+    },
+    {
+      "source": "reform3d_eval/modules/acquisition_robustness/data_loader.py",
+      "destination": "src/reform3d/modules/acquisition_robustness/data_loader.py",
+      "source_sha256": "585f466591f7ce71399f401b3999ccdd73986cb52a54c53fff7dfed441213137",
+      "export_sha256": "b5d4293feaa9c9397400db66cd847edfae23db58b25ef3cd3e7cf1e7830f2fcf"
+    },
+    {
+      "source": "reform3d_eval/modules/cross_modal_alignment/feature_extractor.py",
+      "destination": "src/reform3d/modules/cross_modal_alignment/feature_extractor.py",
+      "source_sha256": "235b32ff7dffb9c40aa3165d1ed2d951f16d46214b394100889419d11ad2e53c",
+      "export_sha256": "f40409616ed4120d22b072f051b7070047fff63b829dd66bb71b92f3b1418f53",
+      "current_audit": "audit.json"
+    },
+    {
+      "source": "reform3d_eval/external_methods/_cross_modal.py",
+      "destination": "src/reform3d/external_methods/_cross_modal.py",
+      "source_sha256": "03c38dacf844d366b954aead262114d487f2fdc7221298e9163b26849022201d",
+      "export_sha256": "3d60257b8184972ac3af06010d277e72f48f94c7e0ba478c660e73739957c61c"
+    },
+    {
+      "source": "reform3d_eval/external_methods/mim/runtime.py",
+      "destination": "src/reform3d/external_methods/mim/runtime.py",
+      "source_sha256": "de7d42614f35cb2b8201afabf3754088ce960e0618f0b6df5eec79862260ecdb",
+      "export_sha256": "b9041846aeae082d92c12173d30b231f9ef5060d8ec09b489829ccbffc2f01b5"
+    },
+    {
+      "source": "reform3d_eval/external_methods/gl_mae/runtime.py",
+      "destination": "src/reform3d/external_methods/gl_mae/runtime.py",
+      "source_sha256": "521032d5039b5e29999799c21642e78d37b06b5d27512d3b978b7d357cb8730c",
+      "export_sha256": "da42c73b33f77a37acd19cf2477822283d5622c3e3459391856d52b38c74b7e0"
+    },
+    {
+      "source": "reform3d_eval/external_methods/mambamim/runtime.py",
+      "destination": "src/reform3d/external_methods/mambamim/runtime.py",
+      "source_sha256": "678b6545599e544ec9b423eedc163c5b7b3b5b28be8dfeec1499450501e72b5e",
+      "export_sha256": "f068a655cb9bdeacc33eb6c119b85ce8a5233978e71af9e56d0f22bc870b4582"
+    },
+    {
+      "source": "reform3d_eval/external_methods/sam_med3d/runtime.py",
+      "destination": "src/reform3d/external_methods/sam_med3d/runtime.py",
+      "source_sha256": "253e5fa5edd73c75d649d3f498693d966511608121a33f02cbe8327859e8fbe7",
+      "export_sha256": "734004da08ac47c6ddef111b7cce4656d1d466090932c0c1ae675e11618aed7b"
+    },
+    {
+      "source": "reform3d_eval/external_methods/hi_end_mae/runtime.py",
+      "destination": "src/reform3d/external_methods/hi_end_mae/runtime.py",
+      "source_sha256": "42575657c275133082bdbcf28e96a7aa5af82c85a4e5be3fcb19ad8b17b87c2a",
+      "export_sha256": "448e3a120c22b8901bdc44f713728a46ff119046443d0e7aff72224394981f2e"
+    },
+    {
+      "source": "reform3d_eval/external_methods/openmind/runtime.py",
+      "destination": "src/reform3d/external_methods/openmind/runtime.py",
+      "source_sha256": "42915e92e9902c4d560cf3c5b71534b21aa2afd4468c05c2a536b1ccd35a5990",
+      "export_sha256": "bf7c1e6a671fa97fa664f54fa6842f3754a1b3ef21a51c39f06a5e81ed6b4df9"
+    },
+    {
+      "source": "reform3d_eval/external_methods/_acquisition.py",
+      "destination": "src/reform3d/external_methods/_acquisition.py",
+      "source_sha256": "ed421a5a5ebdad5ed2b1fe9dd5d41fd90767cc2a5805854ff4edfd6728de6d9d",
+      "export_sha256": "186f6925b6cc43af114e49c3c68bd3aefd3a01c3510dfc9e8920dbcb870fb66c"
+    }
+  ],
+  "new_runtime_helpers": [
+    {
+      "destination": "src/reform3d/encoders/checkpoints.py",
+      "sha256": "44477d415c433255d0590b6c0d6e91795fe80d1dbb375d123b46cc86556e4377"
+    },
+    {
+      "destination": "src/reform3d/encoders/factory.py",
+      "sha256": "23b1685dfaed400c46150886ea7cddbb830ea84bdca209171c62d7214606ff7e"
+    },
+    {
+      "destination": "src/reform3d/external_methods/_sources.py",
+      "sha256": "deb6f163d151ec8e11b0e04f2f794eb384ef6153491a9b93e5e1cc2d81231807"
+    }
+  ],
+  "audit_exclusions": [
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/modeling/sam.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/sam.py",
+      "source_sha256": "2dcc0499a9933bf5395269d8065c18391d6077ce8603187cfb11f7f3d184b04d",
+      "export_sha256": "25111a5d17e35a3116d2c1ac07ea872830309b6b18f09b4d79837bdf45a6d848",
+      "changes": "line-ending normalization",
+      "reason": "Repository audit: unreferenced vendor helper",
+      "archived_local": "validation/local/repo_audit/excluded/src/reform3d/external_methods/SAM-Med3D/segment_anything/modeling/sam.py",
+      "archive_sha256": "25111a5d17e35a3116d2c1ac07ea872830309b6b18f09b4d79837bdf45a6d848"
+    },
+    {
+      "source": "reform3d_eval/external_methods/SAM-Med3D/segment_anything/utils/onnx.py",
+      "destination": "src/reform3d/external_methods/SAM-Med3D/segment_anything/utils/onnx.py",
+      "source_sha256": "f7b7ce586b1af57556bf88958e52c8b0ed82cf02fe61166906b43eb53f9b137f",
+      "export_sha256": "7f715ed9acdfdc1a9abdf3a367a40888839e223e86a7e06cfbb32b9ca8807aea",
+      "changes": "line-ending normalization",
+      "reason": "Repository audit: unreferenced vendor helper",
+      "archived_local": "validation/local/repo_audit/excluded/src/reform3d/external_methods/SAM-Med3D/segment_anything/utils/onnx.py",
+      "archive_sha256": "7f715ed9acdfdc1a9abdf3a367a40888839e223e86a7e06cfbb32b9ca8807aea"
+    }
+  ],
+  "current_audit": "audit.json",
+  "validation_scope": "The validation block records initial export checks; current hashes and later audit coverage are reported separately in audit.json.",
+  "portable_path_roots": {
+    "repo://": "Repository-relative provenance; not a runtime dependency.",
+    "environment:///final-validation": "Historical final-validation environment; not distributed.",
+    "environment:///audit-validation": "Historical audit environment; not distributed.",
+    "environment:///shared-scientific": "Historical shared scientific environment; not distributed."
+  }
+}

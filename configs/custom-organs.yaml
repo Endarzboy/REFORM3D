@@ -1,0 +1,12 @@
+dataset: custom_organs
+manifest: /path/to/organs.csv
+checkpoint_root: /path/to/checkpoints
+checkpoints: [med3dino_rel_96]
+workspace: ../workspace
+run_name: custom-organs
+preset: screening
+seeds: [42, 123, 456]
+feature_types: [cls]
+required_modalities: [ct, mr]
+device: cuda:0
+batch_size: 1

@@ -1,0 +1,91 @@
+{
+  "checkpoint_root": "User-configured path; files not packaged",
+  "checkpoints": [
+    {
+      "aliases": [
+        "Med3DINO-REL-96",
+        "med3dino-rel-96",
+        "med3dino_rel_c96",
+        "med3dino-rel-c96",
+        "med3dino_rel",
+        "Med3DINO-REL"
+      ],
+      "architecture": "vit_large_3d",
+      "bytes": 1416593782,
+      "checkpoint_file": "med3dino_rel/c96_rel_teacher_checkpoint.pth",
+      "checkpoint_key": "med3dino_rel_96",
+      "crop_size": 96,
+      "download_url": null,
+      "exact_pretraining_run_provenance": "unresolved",
+      "exists_at_export": true,
+      "geometry_policy": "relative",
+      "license": "unresolved_checkpoint_redistribution_terms",
+      "release_name": "Med3DINO-REL-96",
+      "sha256": "ec3d925077b5cea459169f5e67d6da7faa7f6796224afd5a2fe6a88d978ef60a"
+    },
+    {
+      "aliases": [
+        "Med3DINO-ISO-96",
+        "med3dino-iso-96",
+        "med3dino_iso_c96",
+        "med3dino-iso-c96",
+        "med3dino_iso",
+        "Med3DINO-ISO"
+      ],
+      "architecture": "vit_large_3d",
+      "bytes": 1416593782,
+      "checkpoint_file": "med3dino_iso/c96_iso_teacher_checkpoint.pth",
+      "checkpoint_key": "med3dino_iso_96",
+      "crop_size": 96,
+      "download_url": null,
+      "exact_pretraining_run_provenance": "unresolved",
+      "exists_at_export": true,
+      "geometry_policy": "isotropic",
+      "license": "unresolved_checkpoint_redistribution_terms",
+      "release_name": "Med3DINO-ISO-96",
+      "sha256": "13af8d7f0157985aaf4da5b884bbdbc49f8e5e5a51eabd6d20e28c382753b74b"
+    },
+    {
+      "aliases": [
+        "Med3DINO-SA-96",
+        "med3dino-sa-96",
+        "med3dino_sa_c96",
+        "med3dino-sa-c96",
+        "med3dino_sa",
+        "Med3DINO-SA"
+      ],
+      "architecture": "vit_large_3d",
+      "bytes": 1416593782,
+      "checkpoint_file": "med3dino_sa/c96_sa_teacher_checkpoint.pth",
+      "checkpoint_key": "med3dino_sa_96",
+      "crop_size": 96,
+      "download_url": null,
+      "exact_pretraining_run_provenance": "unresolved",
+      "exists_at_export": true,
+      "geometry_policy": "spacing_aware",
+      "license": "unresolved_checkpoint_redistribution_terms",
+      "release_name": "Med3DINO-SA-96",
+      "sha256": "a57347561b103ac92c9647644ee5a3de9464e54b4b11f470ebf2e88eac1a6119"
+    },
+    {
+      "aliases": [
+        "DINOv2-3D",
+        "3DINO"
+      ],
+      "architecture": "vit_large_3d",
+      "bytes": 1417113974,
+      "checkpoint_file": "3dinov2/3dinov2_teacher_checkpoint.pth",
+      "checkpoint_key": "3dino",
+      "crop_size": 112,
+      "download_url": null,
+      "exact_pretraining_run_provenance": "unresolved",
+      "exists_at_export": true,
+      "geometry_policy": "relative",
+      "license": "unresolved_checkpoint_redistribution_terms",
+      "release_name": "3DINO",
+      "sha256": "b68dde2e435648bdf72edae70f970b07e4a903a8122c5be9e360bdb076cf695c"
+    }
+  ],
+  "hash_scope": "SHA-256 of complete local checkpoint files; no model deserialization",
+  "schema_version": 1
+}
