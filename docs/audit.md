@@ -1,6 +1,6 @@
-# Repository verification
+# Integrity checks
 
-Validation covers the standalone package, input preparation, cache reuse, and the three evaluation modules on KiTS23 and MMWHS.
+REFORM-3D checks inputs and saved outputs before evaluation or reuse.
 
 | Check | Required behavior |
 |---|---|
@@ -11,6 +11,4 @@ Validation covers the standalone package, input preparation, cache reuse, and th
 | Completed runs | Verify feature and metric checksums before reuse; preserve results during validation |
 | Imports | Run independently of the original Med3DINO checkout |
 
-The tests exercise these failure cases, CPU feature extraction, external adapter interfaces, readout behavior, and seeded aggregation. Install with `python -m pip install -c requirements.txt '.[test]'`, then run `python -m pytest -q`. Optional artifact-dependent tests may be skipped when their inputs are unavailable.
-
-[Validation](../validation/README.md) records the completed two-dataset scope and remaining limitations. Internal manuscript audits, historical table comparisons, and detailed migration logs are kept outside the release.
+See [Testing](../validation/README.md) for the test suite and [Usage](usage.md) for cache reuse and failure handling.

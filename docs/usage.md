@@ -18,7 +18,7 @@ Start from an example YAML. Paths are absolute or relative to that YAML; environ
 
 `check` validates inputs and writes the resolved manifest without inference. `run --dry-run` does the same. A normal run verifies SHA-256 receipts before reusing completed features and metrics. Changed configuration, weights, data fingerprint, or software requires a new `run_name`.
 
-`cache/` stores geometry by input/protocol identity. `features/` additionally separates checkpoint hashes, readouts, precision, batch size, and GPU backend. They can be reused across metric seeds; random sampling remains in the seeded results. Do not edit generated artifacts in place. Legacy crop identities and controlled protocol signatures are invalidated by the audit fixes; affected geometry is rebuilt once. Existing files are preserved.
+`cache/` stores geometry by input/protocol identity. `features/` additionally separates checkpoint hashes, readouts, precision, batch size, and GPU backend. They can be reused across metric seeds; random sampling remains in the seeded results. Do not edit generated artifacts in place.
 
 Incomplete extraction, missing required metrics, incompatible weights, and invalid geometry fail the run. Concurrent writes to the same run or shared artifacts are rejected. Inspect `run.json` and `logs/`; the report identifies incomplete results. Requested unsupported modules fail explicitly.
 

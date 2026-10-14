@@ -4,7 +4,7 @@ Evaluate frozen 3D medical encoders for controlled spacing sensitivity, CT–MR 
 
 ## Install
 
-Use Python 3.11 (validated) and a PyTorch build compatible with your CUDA installation.
+Use Python 3.11 and a PyTorch build compatible with your CUDA installation.
 
 ```bash
 python -m venv .venv
@@ -12,7 +12,7 @@ source .venv/bin/activate
 python -m pip install -c requirements.txt .
 ```
 
-`requirements.txt` records dependency versions for the validated Python 3.11/Linux environment. The `-c` option applies these versions to the dependencies selected by the package. For SAM-Med3D, MiM, and GL-MAE, use `python -m pip install -c requirements.txt '.[external]'`; see [Encoders](docs/encoders.md) for other adapters.
+`requirements.txt` pins dependency versions for Python 3.11 on Linux. The `-c` option applies these versions to the dependencies selected by the package. For SAM-Med3D, MiM, and GL-MAE, use `python -m pip install -c requirements.txt '.[external]'`; see [Encoders](docs/encoders.md) for other adapters.
 
 ## Run
 
@@ -43,7 +43,7 @@ Compare each property separately. Low embedding drift alone does not establish u
 - [Usage](docs/usage.md): configuration, reuse, and failure handling.
 - [Encoders](docs/encoders.md): weights, native features, and optional adapters.
 - [Reproducibility](docs/reproduction.md): three-module evaluation on KiTS23 and MMWHS.
-- [Validation](validation/README.md): completed two-dataset checks and limitations.
-- [Repository verification](docs/audit.md): input, cache, and output integrity checks.
+- [Testing](validation/README.md): installing test dependencies and running the test suite.
+- [Integrity checks](docs/audit.md): input, cache, and output requirements.
 
 The runtime is bundled under `src/reform3d/`; the original Med3DINO checkout is not required. Source attribution and license records are in `docs/LICENSES/`.

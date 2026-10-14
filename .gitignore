@@ -70,3 +70,5 @@ Thumbs.db
 /reproduction/pretraining/
 /validation/two_dataset_reproduction.json
 /validation/two_dataset_reproduction.md
+/reproduction/package_inventory.json
+/reproduction/model_export_manifest.json
