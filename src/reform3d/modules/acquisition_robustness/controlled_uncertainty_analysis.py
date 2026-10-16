@@ -77,6 +77,8 @@ def _write_csv(path: Path, rows: Sequence[Dict[str, Any]]) -> None:
         "analysis_name",
         "checkpoint_name",
         "feature_type",
+        "run_name",
+        "evaluation_seed",
         "status",
         "n_cases",
         "reference_variant",
@@ -126,51 +128,12 @@ def _rowwise_cosine_distance(source_features: np.ndarray, target_features: np.nd
     return 1.0 - (np.sum(source * target, axis=1) / (source_norm * target_norm))
 
 
-def _center_features(features: np.ndarray) -> np.ndarray:
-    values = np.asarray(features, dtype=np.float64)
-    return values - values.mean(axis=0, keepdims=True)
-
-
-def _linear_cka_gram(source_features: np.ndarray, target_features: np.ndarray) -> float:
-    source_centered = _center_features(source_features)
-    target_centered = _center_features(target_features)
-    numerator = np.linalg.norm(source_centered @ target_centered.T, ord="fro") ** 2
-    source_scale = np.linalg.norm(source_centered @ source_centered.T, ord="fro")
-    target_scale = np.linalg.norm(target_centered @ target_centered.T, ord="fro")
-    denominator = source_scale * target_scale
-    if denominator <= 1e-12:
-        return 0.0
-    return float(numerator / denominator)
-
-
-def _linear_cka_feature(source_features: np.ndarray, target_features: np.ndarray) -> float:
-    source_centered = _center_features(source_features)
-    target_centered = _center_features(target_features)
-    source_covariance = source_centered.T @ source_centered
-    target_covariance = target_centered.T @ target_centered
-    numerator = float(np.sum(source_covariance * target_covariance))
-    source_scale = np.linalg.norm(source_covariance, ord="fro")
-    target_scale = np.linalg.norm(target_covariance, ord="fro")
-    denominator = source_scale * target_scale
-    if denominator <= 1e-12:
-        return 0.0
-    return float(numerator / denominator)
-
-
 def _linear_cka(source_features: np.ndarray, target_features: np.ndarray, method: str = "auto") -> float:
-    if method == "gram":
-        return _linear_cka_gram(source_features, target_features)
-    if method == "feature":
-        return _linear_cka_feature(source_features, target_features)
-    if method == "auto":
-        source = np.asarray(source_features)
-        target = np.asarray(target_features)
-        n_cases = max(int(source.shape[0]), int(target.shape[0]))
-        feature_dim = max(int(source.shape[1]), int(target.shape[1]))
-        if feature_dim <= n_cases:
-            return _linear_cka_feature(source_features, target_features)
-        return _linear_cka_gram(source_features, target_features)
-    raise ValueError(f"Unsupported CKA method: {method}")
+    try:
+        from .representation_geometry_analysis import centered_linear_cka
+    except ImportError:  # pragma: no cover - direct script execution
+        from representation_geometry_analysis import centered_linear_cka
+    return centered_linear_cka(source_features, target_features, method=method)
 
 
 def _compact_cka(
@@ -427,9 +390,11 @@ def _build_grouped_bootstrap_split_indices(
 
 
 def _manifest_variant_from_metric_path(metric_path: Path) -> str:
+    if metric_path.parent.parent.name.startswith("seed_"):
+        return DEFAULT_MANIFEST_VARIANT
     relative_parts = metric_path.relative_to(OUTPUTS_ROOT).parts
-    if len(relative_parts) >= 3:
-        return str(relative_parts[2])
+    if len(relative_parts) >= 6:
+        return str(Path(*relative_parts[1:-4]))
     return DEFAULT_MANIFEST_VARIANT
 
 
@@ -437,9 +402,11 @@ def _load_aligned_semantic_targets(
     analysis_name: str,
     manifest_variant: str,
     case_ids: Sequence[str],
+    manifest_path: Path | None = None,
 ) -> tuple[np.ndarray | None, np.ndarray | None, Path | None, Dict[str, Any] | None, str | None]:
     """Load semantic targets and align them to the saved bundle case order."""
-    manifest_path = get_acquisition_manifest_path(
+    explicit_manifest = manifest_path is not None
+    manifest_path = manifest_path or get_acquisition_manifest_path(
         dataset_name=analysis_name,
         manifest_kind="sampled",
         manifest_variant=manifest_variant,
@@ -451,7 +418,7 @@ def _load_aligned_semantic_targets(
         manifest_path,
         mode="auto",
         filter_dataset=analysis_name,
-        cache_dir=get_cache_root(analysis_name, manifest_variant),
+        cache_dir=None if explicit_manifest else get_cache_root(analysis_name, manifest_variant),
     )
     if semantic_labels_full.ndim != 2 or semantic_labels_full.shape[1] == 0:
         return None, None, manifest_path, semantic_metadata, "no_informative_semantic_labels"
@@ -599,7 +566,7 @@ def _discover_metric_jsons(
     feature_types: Sequence[str] | None,
     checkpoints: Sequence[str] | None,
 ) -> list[Path]:
-    metric_paths = sorted(OUTPUTS_ROOT.glob("*/*/results/*/*/perturbation_robustness.json"))
+    metric_paths = sorted(OUTPUTS_ROOT.glob("**/results/*/*/perturbation_robustness.json"))
     if analysis_names:
         analysis_set = set(analysis_names)
         metric_paths = [path for path in metric_paths if path.relative_to(OUTPUTS_ROOT).parts[0] in analysis_set]
@@ -619,11 +586,24 @@ def _analyze_metric_path(
     cka_method: str,
     semantic_cv_splits: int,
 ) -> Dict[str, Any]:
-    relative_parts = metric_path.relative_to(OUTPUTS_ROOT).parts
-    analysis_name = relative_parts[0]
-    checkpoint_name = metric_path.parent.parent.name
-    feature_type = metric_path.parent.name
     payload = _load_json(metric_path)
+    manifest_path = None
+    run_name = None
+    evaluation_seed = None
+    if metric_path.parent.parent.name.startswith("seed_"):
+        run_path = metric_path.parents[3] / "run.json"
+        run = _load_json(run_path)
+        analysis_name = run["configuration"]["dataset"]
+        checkpoint_name = payload["checkpoint"]
+        feature_type = payload["feature_type"]
+        manifest_path = Path(run["manifest"])
+        run_name = run_path.parent.name
+        evaluation_seed = int(metric_path.parent.parent.name.removeprefix("seed_"))
+    else:
+        relative_parts = metric_path.relative_to(OUTPUTS_ROOT).parts
+        analysis_name = relative_parts[0]
+        checkpoint_name = metric_path.parent.parent.name
+        feature_type = metric_path.parent.name
     bundle_name = payload.get("controlled_embedding_bundle", "controlled_embedding_bundle.npz")
     bundle_path = metric_path.parent / str(bundle_name)
 
@@ -631,6 +611,8 @@ def _analyze_metric_path(
         "analysis_name": analysis_name,
         "checkpoint_name": checkpoint_name,
         "feature_type": feature_type,
+        "run_name": run_name,
+        "evaluation_seed": evaluation_seed,
         "metric_json": str(metric_path),
         "bundle_path": str(bundle_path),
         "cka_method": cka_method,
@@ -708,6 +690,7 @@ def _analyze_metric_path(
             analysis_name,
             manifest_variant,
             case_ids,
+            manifest_path=manifest_path,
         )
         semantic_manifest_path = str(manifest_path) if manifest_path is not None else None
         if semantic_error is None and aligned_labels is not None and valid_indices is not None:
@@ -831,6 +814,10 @@ def main() -> None:
         ),
     )
     parser.add_argument("--analysis-names", nargs="+", default=None)
+    parser.add_argument(
+        "--metric-jsons", nargs="+", type=Path,
+        help="Explicit perturbation_robustness.json files, including run-local results under seeds/seed_N/encoder--feature/.",
+    )
     parser.add_argument("--feature-types", nargs="+", default=None)
     parser.add_argument("--checkpoints", nargs="+", default=None)
     parser.add_argument("--bootstrap-resamples", type=int, default=0)
@@ -864,7 +851,15 @@ def main() -> None:
         parser.error("--workers must be >= 0")
     workers = os.cpu_count() or 1 if args.workers == 0 else args.workers
 
-    metric_paths = _discover_metric_jsons(args.analysis_names, args.feature_types, args.checkpoints)
+    if args.metric_jsons and (args.analysis_names or args.feature_types or args.checkpoints):
+        parser.error("Use --metric-jsons or dataset/checkpoint/feature filters, not both")
+    metric_paths = args.metric_jsons or _discover_metric_jsons(args.analysis_names, args.feature_types, args.checkpoints)
+    if not metric_paths:
+        parser.error("No controlled metrics found; use --metric-jsons to select run-local results")
+    inputs = {path.resolve() for path in metric_paths}
+    outputs = {args.output_json.resolve(), args.output_csv.resolve()}
+    if len(outputs) != 2 or inputs & outputs:
+        parser.error("Output JSON and CSV must be separate files and cannot replace input metrics")
     rows = _analyze_metric_paths(
         metric_paths,
         bootstrap_resamples=args.bootstrap_resamples,

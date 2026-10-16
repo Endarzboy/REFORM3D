@@ -491,7 +491,7 @@ def run_controlled_perturbation_analysis(
 
     cka_matrix = _safe_compute_cka(features_by_spacing)
     bundle_path = save_controlled_embedding_bundle(
-        output_dir=output_dir,
+        output_dir=output_dir / "features",
         features_by_spacing=features_by_spacing,
         perturbed_volumes=perturbed_volumes,
         config=config,
@@ -573,7 +573,7 @@ def run_controlled_perturbation_analysis(
         "target_z_spacings": list(config.target_z_spacings) if config.target_z_spacings is not None else None,
         "source_bin": config.source_bin,
         "reference_variant": original_name,
-        "controlled_embedding_bundle": bundle_path.name,
+        "controlled_embedding_bundle": bundle_path.relative_to(output_dir).as_posix(),
         "n_source_volumes": len(perturbed_volumes),
         "representation_drift": representation_drift,
         "representation_drift_std": representation_drift_std,

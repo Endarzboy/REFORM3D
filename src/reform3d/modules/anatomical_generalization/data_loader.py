@@ -32,24 +32,6 @@ ORGAN_KEY_CANDIDATES: Tuple[str, ...] = (
     "anatomy_labels",
 )
 
-PRETRAINING_EXPOSURE_ALIASES = {
-    "abdomenatlas": "pretraining_seen_source",
-    "abdomenct1k": "pretraining_seen_source",
-    "kits23": "pretraining_seen_source",
-    "kits": "pretraining_seen_source",
-    "totalsegmenter_ct": "pretraining_seen_source",
-    "totalsegmenterct": "pretraining_seen_source",
-    "totalsegmenter_mri": "pretraining_unseen_source",
-    "totalsegmentermri": "pretraining_unseen_source",
-    "mmwhs_ct_mr": "pretraining_unseen_source",
-    "mmwhs": "pretraining_unseen_source",
-    "amos22_ct_mr": "pretraining_unseen_source",
-    "amos_ct_mr": "pretraining_unseen_source",
-    "amos22": "pretraining_unseen_source",
-    "chaos_ct_mr": "pretraining_unseen_source",
-    "word": "pretraining_unseen_source",
-}
-
 ORGAN_FAMILY_ALIASES = {
     "aorta": "vascular",
     "ascending_aorta": "vascular",
@@ -153,23 +135,6 @@ def _extract_mask_metadata(sample: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _infer_pretraining_exposure(sample: Dict[str, Any]) -> str:
-    candidates = [
-        sample.get("source_dataset"),
-        sample.get("dataset"),
-        sample.get("image_path"),
-        sample.get("file_path"),
-    ]
-    for candidate in candidates:
-        if candidate is None:
-            continue
-        normalized = str(candidate).strip().lower()
-        for alias, exposure in PRETRAINING_EXPOSURE_ALIASES.items():
-            if alias in normalized:
-                return exposure
-    return "pretraining_exposure_unknown"
-
-
 def load_anatomical_manifest(manifest_path: str | Path) -> List[Dict[str, Any]]:
     """Load one Anatomical Generalization manifest and normalize samples into the evaluator contract.
 
@@ -220,7 +185,6 @@ def load_anatomical_manifest(manifest_path: str | Path) -> List[Dict[str, Any]]:
                 "organ_name": primary_organ,
                 "organ_family": _infer_organ_family(primary_organ),
                 "organ_status": sample.get("organ_status") or "holdout_candidate",
-                "pretraining_exposure": sample.get("pretraining_exposure") or _infer_pretraining_exposure(sample),
                 "evidence_type": sample.get("evidence_type"),
                 "mask_path": mask_path,
                 "mask_metadata": sample.get("mask_metadata") or _extract_mask_metadata(sample),
@@ -231,6 +195,9 @@ def load_anatomical_manifest(manifest_path: str | Path) -> List[Dict[str, Any]]:
                 "raw_sample": sample,
             }
         )
+        # Preserve supplied annotations without deriving exposure from dataset names.
+        if sample.get("pretraining_exposure"):
+            normalized_samples[-1]["pretraining_exposure"] = sample["pretraining_exposure"]
 
     return normalized_samples
 
@@ -365,15 +332,17 @@ def summarize_anatomical_manifest(samples: Sequence[Dict[str, Any]]) -> Dict[str
     split_counter = Counter(sample.get("split") or "unspecified" for sample in samples)
     primary_organ_counter = Counter(sample.get("organ_name") or sample.get("primary_organ") or "unassigned" for sample in samples)
     source_case_counter = Counter(sample.get("source_case_id") or "unknown" for sample in samples)
-    exposure_counter = Counter(sample.get("pretraining_exposure") or "unknown" for sample in samples)
+    exposure_counter = Counter(sample["pretraining_exposure"] for sample in samples if sample.get("pretraining_exposure"))
     dataset_counter = Counter(sample.get("source_dataset") or sample.get("dataset") or "unknown" for sample in samples)
 
-    return {
+    summary = {
         "n_samples": len(samples),
         "modalities": dict(sorted(modality_counter.items())),
         "splits": dict(sorted(split_counter.items())),
         "primary_organs": dict(sorted(primary_organ_counter.items())),
         "source_datasets": dict(sorted(dataset_counter.items())),
-        "pretraining_exposure": dict(sorted(exposure_counter.items())),
         "n_unique_source_cases": len(source_case_counter),
     }
+    if exposure_counter:
+        summary["pretraining_exposure"] = dict(sorted(exposure_counter.items()))
+    return summary

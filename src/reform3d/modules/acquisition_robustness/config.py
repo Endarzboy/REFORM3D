@@ -126,7 +126,6 @@ class RawDatasetConfig:
     label_path: Optional[Path] = None
     file_pattern: str = "*.nii.gz"
     notes: str = ""
-    is_pretraining_data: bool = True  # False = unseen/held-out for generalization test
     is_validated: bool = False  # True = corrupted files already removed, skip validation
     is_enabled: bool = True  # False = skip this dataset in manifest building
 
@@ -198,7 +197,6 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         label_path=KITS23_DATA_ROOT / "masks",
         file_pattern="*_ct.nii.gz",
         notes="KiTS23 kidney CT with image/mask folders and case-level kidney, tumor, and cyst labels.",
-        is_pretraining_data=False,
         is_validated=False,
     ),
     "totalsegmenter_ct": RawDatasetConfig(
@@ -209,7 +207,6 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         label_path=None,  # Per-case segmentations directory resolved from image path.
         file_pattern="ct.nii.gz",
         notes="TotalSegmentator CT with per-structure segmentation directory; controlled acquisition robustness candidate.",
-        is_pretraining_data=False,
         is_validated=False,
         is_enabled=False,
     ),
@@ -221,7 +218,6 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         label_path=None,  # Per-case segmentations directory resolved from image path.
         file_pattern="mri.nii.gz",
         notes="TotalSegmenterMRI with per-structure segmentation directory; MR controlled acquisition robustness candidate.",
-        is_pretraining_data=False,
         is_validated=False,
         is_enabled=False,
     ),

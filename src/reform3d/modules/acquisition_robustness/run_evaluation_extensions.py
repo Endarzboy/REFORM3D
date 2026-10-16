@@ -136,7 +136,7 @@ def _run_metric_surface(
                     "checkpoint": checkpoint,
                     "feature_type": feature_type,
                     "result": str(result_dir / "perturbation_robustness.json"),
-                    "bundle": str(result_dir / "controlled_embedding_bundle.npz"),
+                    "bundle": str(result_dir / "features" / "controlled_embedding_bundle.npz"),
                 }
             )
     return records

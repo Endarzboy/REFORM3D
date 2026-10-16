@@ -4,5 +4,4 @@ __all__ = [
     "acquisition_robustness",
     "anatomical_generalization",
     "cross_modal_alignment",
-    "explanatory_geometry",
 ]

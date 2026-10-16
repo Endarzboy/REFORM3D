@@ -211,23 +211,12 @@ def _build_headline_metrics(surface_b_analysis: Dict[str, Any]) -> Dict[str, Any
 
 
 def _build_anatomical_protocol(
-    summary: Dict[str, Any],
     required_modalities: Sequence[str],
     supported_organs: Sequence[str],
 ) -> Dict[str, Any]:
     required_modalities = [str(modality).lower() for modality in required_modalities]
     surface_scope = "within_modality" if len(required_modalities) == 1 else "cross_modality"
-    exposures = set((summary.get("pretraining_exposure") or {}).keys())
-    if surface_scope == "within_modality":
-        surface_stratum = f"{required_modalities[0]}_within_dataset_holdout_surface"
-    elif exposures == {"pretraining_unseen_source"}:
-        surface_stratum = "pretraining_unseen_ct_mr_validation"
-    elif "pretraining_seen_source" in exposures and "pretraining_unseen_source" in exposures:
-        surface_stratum = "mixed_exposure_ct_mr_anchor"
-    elif exposures == {"pretraining_seen_source"}:
-        surface_stratum = "pretraining_seen_ct_mr_surface"
-    else:
-        surface_stratum = "mixed_or_unknown_exposure_surface"
+    surface_stratum = f"{'_'.join(required_modalities)}_case_disjoint_target_transfer"
     return {
         "target_definition": "low_shot_target_organ",
         "target_definition_note": (
@@ -314,10 +303,10 @@ def _resolve_spacing_bundle_path(
         dataset_name,
         normalize_acquisition_manifest_variant(manifest_variant),
     )
-    return (
-        get_acquisition_checkpoint_feature_dir(acquisition_paths["results"], checkpoint_name, feature_type)
-        / "controlled_embedding_bundle.npz"
-    )
+    result_dir = get_acquisition_checkpoint_feature_dir(acquisition_paths["results"], checkpoint_name, feature_type)
+    bundle = result_dir / "features" / "controlled_embedding_bundle.npz"
+    legacy_bundle = result_dir / "controlled_embedding_bundle.npz"
+    return legacy_bundle if not bundle.exists() and legacy_bundle.is_file() else bundle
 
 
 def _build_feature_projection_settings(
@@ -576,7 +565,7 @@ def _evaluate_single_bundle(
         _write_json(resolved_output_path.parent / "support_size_sweep.json", support_sweep_payload)
         _write_csv(resolved_output_path.parent / "support_size_sweep.csv", support_size_sweep_csv_rows(support_sweep_payload))
     manifest_summary = summarize_anatomical_manifest(samples)
-    anatomical_protocol = _build_anatomical_protocol(manifest_summary, required_modalities, supported_organs)
+    anatomical_protocol = _build_anatomical_protocol(required_modalities, supported_organs)
     surface_b_payload = {
         "status": few_shot_analysis.get("status"),
         "surface_name": "surface_b_few_shot_transfer_evidence",

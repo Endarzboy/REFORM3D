@@ -2,8 +2,6 @@
 from __future__ import annotations
 import argparse
 import contextlib
-import csv
-import html
 import importlib
 import json
 import math
@@ -14,6 +12,8 @@ import time
 from dataclasses import replace
 from pathlib import Path
 from .settings import artifact_lock, configure_environment, digest, file_hash, load_settings, write_json
+from .workspace import (run_directory, module_directory, cache_directory, feature_directory,
+                        reuse_features, link_artifact)
 
 
 def _call(module, arguments):
@@ -128,6 +128,10 @@ def _verified_completed(previous):
 
 
 def _feature_provenance(path, identity, artifact, *, seal=False):
+    if path.is_symlink() or artifact.is_symlink() or path.parent.is_symlink():
+        raise ValueError(f'Feature storage must be inside the encoder result folder: {path.parent}')
+    if artifact.exists() and not path.is_file():
+        raise ValueError(f'Existing feature artifact has no identity receipt: {artifact}')
     saved = json.loads(path.read_text()) if path.exists() else dict(identity)
     previous_hash = saved.pop('feature_sha256', None)
     if saved != identity:
@@ -145,25 +149,19 @@ def _feature_provenance(path, identity, artifact, *, seal=False):
 
 
 def _report(run_dir, cfg, rows, status='complete'):
-    groups = {}
-    for row in rows:
-        key = (row['checkpoint'], row['feature'], row['module'], row['metric'])
-        groups.setdefault(key, []).append(row['value'])
-    summary = [{'checkpoint': k[0], 'feature': k[1], 'module': k[2], 'metric': k[3], 'mean': statistics.mean(v), 'std': statistics.stdev(v) if len(v) > 1 else None, 'n_seeds': len(v)} for k, v in sorted(groups.items())]
-    columns = ['checkpoint', 'feature', 'module', 'metric', 'mean', 'std', 'n_seeds']
-    with (run_dir / 'scores.csv').open('w', newline='') as stream:
-        writer = csv.DictWriter(stream, fieldnames=columns); writer.writeheader(); writer.writerows(summary)
-    best = {}
-    for row in summary:
-        key = row['module'] + '/' + row['metric']
-        current = best.get(key)
-        if current is None or (row['mean'] < current['mean'] if row['metric'] in {'drift', 'organ_clisi'} else row['mean'] > current['mean']):
-            best[key] = row
-    profile = {'status': status, 'dataset': cfg['dataset'], 'not_evaluated': cfg['not_evaluated'], 'metrics': summary, 'highest_observed_per_property': best, 'interpretation': 'Descriptive frozen-feature comparisons for this cohort and protocol. No overall score or guaranteed downstream winner. SD describes evaluation seeds, not pretraining runs.'}
-    write_json(run_dir / 'profile.json', profile)
-    esc = lambda value: html.escape(str(value))
-    cells = ''.join('<tr>' + ''.join('<td>' + esc(row[c] if row[c] is not None else 'n/a') + '</td>' for c in columns) + '</tr>' for row in summary)
-    (run_dir / 'report.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>REFORM-3D profile</title><style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:0 20px;color:#142635}table{border-collapse:collapse;width:100%}th,td{padding:10px;text-align:left;border-bottom:1px solid #ddd}th{background:#eef4f7}</style><h1>REFORM-3D: ' + esc(cfg['dataset']) + '</h1><p>Status: ' + esc(status) + '</p><p>' + esc(profile['interpretation']) + '</p><p>Not evaluated: ' + esc(', '.join(cfg['not_evaluated']) or 'none') + '</p><table><tr>' + ''.join('<th>'+esc(c)+'</th>' for c in columns) + '</tr>' + cells + '</table></html>')
+    from .reporting import write_report
+    return write_report(run_dir, cfg, rows, status)
+
+
+def _reports(run_dir, cfg, rows, status='complete'):
+    profile = _report(run_dir, cfg, rows, status)
+    if len(cfg['modules']) > 1:
+        for module in cfg['modules']:
+            destination = module_directory(cfg, module)
+            destination.mkdir(parents=True, exist_ok=True)
+            link_artifact(run_dir / 'run.json', destination / 'run.json')
+            scoped = {**cfg, 'modules': [module]}
+            _report(destination, scoped, [r for r in rows if r['module'] == module], status)
     return profile
 
 
@@ -173,6 +171,8 @@ def _run(cfg, *, dry_run=False):
     checkpoints = _checkpoints(cfg)
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / 'logs').mkdir(exist_ok=True)
+    for module in cfg['modules']:
+        (module_directory(cfg, module) / 'logs').mkdir(parents=True, exist_ok=True)
     print('Checking inputs and preparing manifest...', flush=True)
     with (run_dir / 'logs' / 'preparation.log').open('a') as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
         manifest, payload, manifest_hash = prepare_manifest(cfg)
@@ -212,6 +212,7 @@ def _run(cfg, *, dry_run=False):
     if dry_run:
         return state
     workspace = Path(cfg['workspace'])
+    report_cfg = {**cfg, 'checkpoints': list(weights)}
     rows = []
     try:
         import numpy as np
@@ -226,15 +227,21 @@ def _run(cfg, *, dry_run=False):
             for feature in cfg['feature_types']:
                 geometry = {'manifest': manifest_hash, 'crop': checkpoint.crop_size, 'bbox_margin': cfg['bbox_margin'], 'outside_organ_mask': cfg['outside_organ_mask'], 'min_mask_voxels': cfg['min_mask_voxels'], 'source_bin': cfg['source_bin'], 'n_source_volumes': cfg['n_source_volumes'], 'software': geometry_software}
                 geometry_id = digest(geometry)[:20]
-                cache = workspace / 'cache' / geometry_id
+                cache = cache_directory(cfg, 'acquisition' if 'acquisition' in cfg['modules'] else 'organs', geometry_id)
                 feature_identity = {'bundle_version': 1, 'geometry': geometry, 'checkpoint_sha256': weights[checkpoint.checkpoint_key], 'architecture': checkpoint.architecture, 'encoder_software': encoder_software, 'feature': feature, 'execution': execution}
-                feature_id = digest(feature_identity)[:20]
-                bundle = workspace / 'features' / feature_id
+                bundle = feature_directory(cfg, checkpoint.checkpoint_key, feature, cfg['seeds'][0], cfg['modules'][0])
+                # Geometry caches contain preprocessed inputs, never encoder features.
+                legacy_cache = workspace / 'cache' / geometry_id
+                if legacy_cache.is_dir() and not cache.exists():
+                    link_artifact(legacy_cache, cache)
                 bundle.mkdir(parents=True, exist_ok=True)
                 with artifact_lock(bundle / '.lock'), artifact_lock(cache / '.lock'):
-                    organ_npz = bundle / 'organ_features.npz'
-                    feature_artifact = bundle / 'controlled_features.npz' if 'acquisition' in cfg['modules'] else organ_npz
+                    artifact_name = 'controlled_embedding_bundle.npz' if 'acquisition' in cfg['modules'] else 'organ_features.npz'
+                    feature_artifact = bundle / artifact_name
                     _feature_provenance(bundle / 'identity.json', feature_identity, feature_artifact)
+                    reuse_features(cfg, checkpoint.checkpoint_key, feature, bundle, feature_identity, artifact_name)
+                    _feature_provenance(bundle / 'identity.json', feature_identity, feature_artifact)
+                    organ_npz = bundle / 'organ_features.npz'
                     if 'acquisition' not in cfg['modules']:
                         if not organ_npz.exists():
                             print(f'Extracting {checkpoint.checkpoint_key}/{feature} organ features...', flush=True)
@@ -246,19 +253,28 @@ def _run(cfg, *, dry_run=False):
                         _feature_provenance(bundle / 'identity.json', feature_identity, feature_artifact, seal=True)
                     for seed in cfg['seeds']:
                         os.environ['MED3DINO_REFORM3D_ACTIVE_SEED'] = str(seed)
-                        leaf = run_dir / 'seeds' / f'seed_{seed}' / f'{checkpoint.checkpoint_key}--{feature}'
-                        leaf.mkdir(parents=True, exist_ok=True)
                         for module in cfg['modules']:
+                            module_dir = module_directory(cfg, module)
+                            leaf = module_dir / 'seeds' / f'seed_{seed}' / f'{checkpoint.checkpoint_key}--{feature}'
+                            local_features = leaf / 'features'
+                            local_features.mkdir(parents=True, exist_ok=True)
+                            feature_artifact = local_features / artifact_name
+                            _feature_provenance(local_features / 'identity.json', feature_identity, feature_artifact)
+                            reuse_features(cfg, checkpoint.checkpoint_key, feature, local_features, feature_identity, artifact_name)
+                            _feature_provenance(local_features / 'identity.json', feature_identity, feature_artifact)
+                            organ_npz = local_features / 'organ_features.npz'
+                            os.environ['REFORM3D_ENCODER_DIR'] = str(leaf)
+                            os.environ['REFORM3D_CACHE_DIR'] = str(cache)
                             metric_file = leaf / (module + '.json')
                             print(f'Evaluating {module}: {checkpoint.checkpoint_key}/{feature}, seed {seed}', flush=True)
-                            with (run_dir / 'logs' / f'{checkpoint.checkpoint_key}-{feature}-{module}-seed{seed}.log').open('a') as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+                            with (module_dir / 'logs' / f'{checkpoint.checkpoint_key}-{feature}-{module}-seed{seed}.log').open('a') as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
                                 if str(metric_file.resolve()) not in verified_metrics:
                                     if module == 'acquisition':
                                         from .modules.acquisition_robustness.config import ControlledPerturbationConfig, MRI_CONTROLLED_PERTURBATION_CONFIG
                                         from .modules.acquisition_robustness.perturbation_robustness_analysis import run_controlled_perturbation
                                         protocol = replace(MRI_CONTROLLED_PERTURBATION_CONFIG) if payload.get('modality') == 'mr' else ControlledPerturbationConfig()
                                         protocol.source_bin = cfg['source_bin']; protocol.n_source_volumes = cfg['n_source_volumes']
-                                        result = run_controlled_perturbation(manifest, checkpoint.checkpoint_key, feature_type=feature, config=protocol, output_dir=leaf, figures_dir=leaf / 'figures', cache_dir=cache, semantic_cache_dir=cache / 'semantics', analysis_name=cfg['dataset'], random_state=seed, compute_matched_semantic_probing=False, compute_drift_figure=False, feature_cache_path=bundle / 'controlled_features.npz', device=cfg['device'], batch_size=cfg['batch_size'])
+                                        result = run_controlled_perturbation(manifest, checkpoint.checkpoint_key, feature_type=feature, config=protocol, output_dir=leaf, figures_dir=leaf / 'figures', cache_dir=cache, semantic_cache_dir=cache / 'semantics', analysis_name=cfg['dataset'], random_state=seed, compute_matched_semantic_probing=False, compute_drift_figure=False, feature_cache_path=feature_artifact, device=cfg['device'], batch_size=cfg['batch_size'])
                                         expected = sum(v['anisotropy_bin'] == protocol.source_bin for v in payload['volumes'])
                                         if protocol.n_source_volumes:
                                             expected = min(expected, protocol.n_source_volumes)
@@ -272,12 +288,12 @@ def _run(cfg, *, dry_run=False):
                                         _call('modules.cross_modal_alignment.evaluation_pipeline', ['--manifest', manifest, '--analysis-name', cfg['dataset'], '--manifest-variant', 'core', '--embeddings-npz', organ_npz, '--checkpoint-name', checkpoint.checkpoint_key, '--feature-type', feature, '--metrics-output', metric_file, '--summary-output-dir', leaf / 'cohort', '--retrieval-diagnostics-output', leaf / 'retrieval_diagnostics.json', '--seed', seed, '--bootstrap-resamples', cfg['bootstrap_resamples'], '--bbox-margin', cfg['bbox_margin'], '--outside-organ-mask', cfg['outside_organ_mask'], '--required-modalities', *cfg['required_modalities']])
                                     else:
                                         _call('modules.anatomical_generalization.evaluation_pipeline', ['--manifest', manifest, '--analysis-name', cfg['dataset'], '--manifest-variant', 'core', '--embeddings-npz', organ_npz, '--checkpoint-name', checkpoint.checkpoint_key, '--feature-type', feature, '--output-path', metric_file, '--manifest-summary-output-dir', leaf / 'cohort', '--seed', seed, '--few-shot-seeds', seed, '--few-shot-support-per-modality', cfg['support_per_modality'], '--required-modalities', *cfg['required_modalities'], '--min-samples-per-modality', cfg['min_samples_per_modality']])
-                                feature_sha = _feature_provenance(bundle / 'identity.json', feature_identity, feature_artifact, seal=True)
+                                feature_sha = _feature_provenance(local_features / 'identity.json', feature_identity, feature_artifact, seal=True)
                                 metrics = read_metrics(module, metric_file)
-                            rows.extend({'checkpoint': checkpoint.checkpoint_key, 'feature': feature, 'module': module, 'metric': key, 'seed': seed, 'value': value} for key, value in metrics.items())
+                            rows.extend({'checkpoint': checkpoint.checkpoint_key, 'feature': feature, 'module': module, 'metric': key, 'seed': seed, 'value': value, 'path': str(metric_file)} for key, value in metrics.items())
                             state['completed'].append({'checkpoint': checkpoint.checkpoint_key, 'feature': feature, 'module': module, 'seed': seed, 'path': str(metric_file), 'sha256': file_hash(metric_file), 'feature_path': str(feature_artifact), 'feature_sha256': feature_sha})
                             write_json(state_path, state)
-        _report(run_dir, cfg, rows)
+        _reports(run_dir, report_cfg, rows)
         state['status'] = 'complete'; state['elapsed_seconds'] = time.time() - state['started_unix']
         write_json(state_path, state)
         print(f'Complete: {run_dir / "report.html"}', flush=True)
@@ -286,26 +302,65 @@ def _run(cfg, *, dry_run=False):
         state['status'] = 'failed'; state['error'] = str(exc)
         state['elapsed_seconds'] = time.time() - state['started_unix']
         write_json(state_path, state)
-        _report(run_dir, cfg, rows, status='incomplete')
+        _reports(run_dir, report_cfg, rows, status='incomplete')
         raise
     finally:
         os.environ.pop('MED3DINO_REFORM3D_ACTIVE_SEED', None)
+        os.environ.pop('REFORM3D_ENCODER_DIR', None)
+        os.environ.pop('REFORM3D_CACHE_DIR', None)
 
 
 
 def run(cfg, *, dry_run=False):
-    import fcntl
-    run_dir = Path(cfg['workspace']) / 'runs' / cfg['run_name']
-    run_dir.mkdir(parents=True, exist_ok=True)
-    with (run_dir / '.run.lock').open('a') as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise RuntimeError(f'Another process is writing run {cfg["run_name"]}') from exc
-        try:
-            return _run(cfg, dry_run=dry_run)
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
+    run_dir = run_directory(cfg)
+    legacy = Path(cfg['workspace']) / 'runs' / cfg['run_name']
+    if legacy.exists() and not legacy.is_symlink() and not run_dir.exists():
+        raise ValueError(f'Legacy run exists at {legacy}. Choose a new run_name to preserve its outputs.')
+    destinations = {run_dir, *(module_directory(cfg, module) for module in cfg['modules'])}
+    with contextlib.ExitStack() as locks:
+        for directory in sorted(destinations):
+            locks.enter_context(artifact_lock(directory / '.run.lock'))
+        # Check every module before creating ownership links or writing results.
+        for directory in destinations - {run_dir}:
+            state_path = directory / 'run.json'
+            if state_path.exists() or state_path.is_symlink():
+                if state_path.resolve() != (run_dir / 'run.json').resolve():
+                    raise ValueError(f'Module directory belongs to another run: {directory}; choose a new run_name.')
+            elif any(path.name != '.run.lock' for path in directory.iterdir()):
+                raise ValueError(f'Module directory has outputs without a run receipt: {directory}; choose a new run_name.')
+        for directory in destinations - {run_dir}:
+            link_artifact(run_dir / 'run.json', directory / 'run.json')
+        return _run(cfg, dry_run=dry_run)
+
+
+def refresh_report(run_dir):
+    """Rebuild presentation from verified saved results, without model inference."""
+    run_dir = Path(run_dir).expanduser().resolve()
+    state_path = (run_dir / 'run.json').resolve()
+    with artifact_lock(state_path.parent / '.run.lock'):
+        state = json.loads(state_path.read_text())
+        if state['status'] in {'running', 'prepared'}:
+            raise ValueError('Wait for the evaluation to stop before rebuilding its report')
+        _verified_completed(state)
+        cfg = {**state['configuration'], 'checkpoints': list(state['checkpoint_hashes'])}
+        rows, seen = [], set()
+        for entry in state.get('completed', []):
+            key = tuple(entry[name] for name in ('checkpoint', 'feature', 'module', 'seed'))
+            if key in seen:
+                raise ValueError(f'Duplicate completed evaluation: {key}')
+            seen.add(key)
+            metrics = read_metrics(entry['module'], entry['path'])
+            rows.extend({**{k: entry[k] for k in ('checkpoint', 'feature', 'module', 'seed', 'path')},
+                         'metric': name, 'value': value} for name, value in metrics.items())
+        # A module report may link to a shared multi-module run receipt.
+        if run_dir != state_path.parent and run_dir.parent.name in cfg['modules']:
+            module = run_dir.parent.name
+            cfg['modules'] = [module]
+            rows = [r for r in rows if r['module'] == module]
+        status = 'complete' if state['status'] == 'complete' else 'incomplete'
+        if run_dir == state_path.parent and run_dir == run_directory(cfg):
+            return _reports(run_dir, cfg, rows, status)
+        return _report(run_dir, cfg, rows, status)
 
 
 def main():
@@ -316,9 +371,15 @@ def main():
         command.add_argument('--config', required=True, type=Path)
         if name == 'run':
             command.add_argument('--dry-run', action='store_true')
+    command = sub.add_parser('report', help='Rebuild reports from saved results without inference')
+    command.add_argument('--run-dir', required=True, type=Path)
     args = parser.parse_args()
     try:
-        run(load_settings(args.config), dry_run=args.command == 'check' or getattr(args, 'dry_run', False))
+        if args.command == 'report':
+            refresh_report(args.run_dir)
+            print(f'Report: {args.run_dir / "report.html"}')
+        else:
+            run(load_settings(args.config), dry_run=args.command == 'check' or getattr(args, 'dry_run', False))
     except Exception as exc:
         parser.exit(1, f'REFORM-3D failed: {exc}\n')
 

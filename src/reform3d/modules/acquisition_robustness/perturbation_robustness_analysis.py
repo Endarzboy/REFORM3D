@@ -18,6 +18,8 @@ from dataclasses import dataclass
 import json
 import gc
 import hashlib
+import os
+import tempfile
 
 import numpy as np
 import torch
@@ -978,10 +980,61 @@ def save_controlled_embedding_bundle(
     for spacing_name, features in features_by_spacing.items():
         bundle_arrays[f"features__{spacing_name}"] = features.astype(np.float32, copy=False)
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     bundle_path = output_dir / CONTROLLED_EMBEDDING_BUNDLE_NAME
-    np.savez_compressed(bundle_path, **bundle_arrays)
+    with tempfile.NamedTemporaryFile(dir=output_dir, suffix=".npz", delete=False) as temporary:
+        temporary_path = Path(temporary.name)
+    try:
+        np.savez_compressed(temporary_path, **bundle_arrays)
+        temporary_path.replace(bundle_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     logger.info(f"Saved controlled embedding bundle to {bundle_path}")
     return bundle_path
+
+
+def _load_controlled_features(
+    path: Path,
+    volumes: List[PerturbedVolume],
+    config: ControlledPerturbationConfig,
+    checkpoint_name: str,
+    feature_type: str,
+    dataset_name: str,
+) -> Tuple[Dict[str, np.ndarray], bool]:
+    """Read the analysis bundle, accepting the old extraction schema for migration."""
+    expected_names = config.describe_targets() + list(config.extra_perturbations or [])
+    expected_paths = [str(volume.original_path) for volume in volumes]
+    try:
+        with np.load(path, allow_pickle=False) as bundle:
+            rich_bundle = "case_ids" in bundle
+            case_key = "case_ids" if rich_bundle else "source_paths"
+            if bundle[case_key].tolist() != expected_paths:
+                raise ValueError("Controlled feature cache has different source cases or case order")
+            names = bundle["variant_names"].tolist()
+            if len(names) != len(set(names)) or set(names) != set(expected_names):
+                raise ValueError("Controlled feature cache has duplicate or incomplete protocol variants")
+            if rich_bundle:
+                identity = {
+                    "checkpoint": checkpoint_name,
+                    "feature_type": feature_type,
+                    "dataset": dataset_name,
+                    "perturbation_protocol": config.protocol_name,
+                }
+                for key, expected in identity.items():
+                    if bundle[key].shape != () or bundle[key].item() != expected:
+                        raise ValueError(f"Controlled embedding bundle has different {key}")
+                expected_metadata = _resolve_variant_metadata(config, volumes, names)
+                if not np.array_equal(bundle["target_spacings_mm"], expected_metadata["target_spacings_mm"], equal_nan=True):
+                    raise ValueError("Controlled embedding bundle has different target spacings")
+                if bundle["reference_variant_name"].item() != expected_names[0]:
+                    raise ValueError("Controlled embedding bundle has a different reference variant")
+            features = {
+                name: bundle[f"features__{name}" if rich_bundle else f"features_{index}"].copy()
+                for index, name in enumerate(names)
+            }
+    except (KeyError, OSError, TypeError) as error:
+        raise ValueError(f"Incomplete or unreadable controlled embedding bundle: {path}") from error
+    return features, rich_bundle
 
 
 def _build_matched_split_indices(
@@ -1475,6 +1528,9 @@ def run_controlled_perturbation(
         figures_dir: Output directory for figures
         cache_dir: Directory for resampled volume cache
         semantic_cache_dir: Directory for matched semantic label cache
+        feature_cache_path: Optional existing embedding bundle to reuse. The
+            canonical bundle lives in output_dir/features and also serves as
+            the inference cache on subsequent calls.
 
     Returns:
         ControlledPerturbationResults dataclass
@@ -1506,6 +1562,13 @@ def run_controlled_perturbation(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
+    bundle_path = output_dir / "features" / CONTROLLED_EMBEDDING_BUNDLE_NAME
+    cache_path = Path(feature_cache_path) if feature_cache_path is not None else bundle_path
+    if bundle_path.is_symlink() or bundle_path.parent.is_symlink():
+        raise ValueError(f"Controlled embeddings must be stored inside the encoder folder: {bundle_path}")
+    if bundle_path.exists() and cache_path.absolute() != bundle_path.absolute():
+        if not cache_path.exists() or not bundle_path.samefile(cache_path):
+            raise ValueError(f"A different controlled embedding bundle already exists: {bundle_path}")
 
     # Use provided cache_dir or default
     effective_cache_dir = cache_dir or get_cache_root(dataset_name, manifest_variant)
@@ -1531,16 +1594,13 @@ def run_controlled_perturbation(
     if not perturbed_volumes:
         raise ValueError("No eligible controlled source volumes")
 
-    expected_paths = [volume.original_path for volume in perturbed_volumes]
-    reused_features = feature_cache_path is not None and feature_cache_path.exists()
+    expected_paths = [str(volume.original_path) for volume in perturbed_volumes]
+    reused_features = cache_path.exists()
+    rich_bundle = False
     if reused_features:
-        with np.load(feature_cache_path, allow_pickle=False) as bundle:
-            if bundle["source_paths"].tolist() != expected_paths:
-                raise ValueError("Controlled feature cache has different source cases")
-            names = bundle["variant_names"].tolist()
-            if len(names) != len(set(names)) or set(names) != set(expected_variants):
-                raise ValueError("Controlled feature cache has duplicate or incomplete protocol variants")
-            features_by_spacing = {name: bundle[f"features_{i}"].copy() for i, name in enumerate(names)}
+        features_by_spacing, rich_bundle = _load_controlled_features(
+            cache_path, perturbed_volumes, config, checkpoint_name, feature_type, dataset_name,
+        )
     else:
         extraction = ExtractionConfig(extract_cls=feature_type == "cls", extract_avg_pool=feature_type == "avg_pool", extract_multilayer=feature_type == "multilayer", device=device, batch_size=batch_size)
         extractor = FeatureExtractor(checkpoint_name, config=extraction)
@@ -1551,16 +1611,10 @@ def run_controlled_perturbation(
     if set(features_by_spacing) != set(expected_variants):
         raise ValueError("Controlled embeddings have incomplete protocol variants")
     features_by_spacing = {name: features_by_spacing[name] for name in expected_variants}
-    if any(array.ndim != 2 or array.shape[0] != len(expected_paths) or array.shape[1] < 1 or not np.isfinite(array).all() for array in features_by_spacing.values()):
+    if any(array.dtype.kind not in "fi" or array.ndim != 2 or array.shape[0] != len(expected_paths) or array.shape[1] < 1 or not np.isfinite(array).all() for array in features_by_spacing.values()):
         raise ValueError("Incomplete or nonfinite controlled embeddings")
     if len({array.shape[1] for array in features_by_spacing.values()}) != 1:
         raise ValueError("Controlled variants have inconsistent feature dimensions")
-    if feature_cache_path is not None and not reused_features:
-        feature_cache_path.parent.mkdir(parents=True, exist_ok=True)
-        arrays = {f"features_{i}": array for i, array in enumerate(features_by_spacing.values())}
-        temporary = feature_cache_path.with_suffix(".tmp.npz")
-        np.savez_compressed(temporary, source_paths=np.asarray(expected_paths), variant_names=np.asarray(list(features_by_spacing)), **arrays)
-        temporary.replace(feature_cache_path)
     variant_names = list(features_by_spacing.keys())
     variant_metadata = _resolve_variant_metadata(config, perturbed_volumes, variant_names)
     variant_metadata_json = _variant_metadata_for_json(variant_metadata, variant_names)
@@ -1584,17 +1638,26 @@ def run_controlled_perturbation(
     logger.info("Computing CKA between spacing variants...")
     cka_matrix = compute_cka_between_variants(features_by_spacing)
 
-    bundle_path = save_controlled_embedding_bundle(
-        output_dir=output_dir,
-        features_by_spacing=features_by_spacing,
-        perturbed_volumes=perturbed_volumes,
-        config=config,
-        checkpoint_name=checkpoint_name,
-        feature_type=feature_type,
-        dataset_name=dataset_name,
-        manifest_variant=manifest_variant,
-        reference_variant=original_name,
-    )
+    if rich_bundle:
+        if cache_path.absolute() != bundle_path.absolute():
+            bundle_path.parent.mkdir(parents=True, exist_ok=True)
+            if bundle_path.exists():
+                if not bundle_path.samefile(cache_path):
+                    raise ValueError(f"A different controlled embedding bundle already exists: {bundle_path}")
+            else:
+                os.link(cache_path, bundle_path)
+    else:
+        bundle_path = save_controlled_embedding_bundle(
+            output_dir=bundle_path.parent,
+            features_by_spacing=features_by_spacing,
+            perturbed_volumes=perturbed_volumes,
+            config=config,
+            checkpoint_name=checkpoint_name,
+            feature_type=feature_type,
+            dataset_name=dataset_name,
+            manifest_variant=manifest_variant,
+            reference_variant=original_name,
+        )
 
     # Compute matched semantic probing/transfer if semantic targets are available.
     matched_semantic_probing = None
@@ -1712,7 +1775,7 @@ def run_controlled_perturbation(
         "source_bin": config.source_bin,
         "reference_variant": original_name,
         "variant_metadata": variant_metadata_json,
-        "controlled_embedding_bundle": bundle_path.name,
+        "controlled_embedding_bundle": bundle_path.relative_to(output_dir).as_posix(),
         "n_source_volumes": len(perturbed_volumes),
         "representation_drift": representation_drift,
         "representation_drift_std": representation_drift_std,

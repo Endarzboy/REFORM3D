@@ -14,7 +14,6 @@ __all__ = [
     "manifest_generation",
     "native_uncertainty_analysis",
     "perturbation_robustness_analysis",
-    "regenerate_anisotropy_regression_from_cache",
     "representation_geometry_analysis",
     "protocol_artifacts",
     "run_acquisition_robustness",

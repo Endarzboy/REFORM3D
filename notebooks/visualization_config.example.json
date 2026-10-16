@@ -1,0 +1,87 @@
+{
+  "checkpoints": {
+    "med3dino_iso_96": "/path/to/checkpoints/med3dino_iso/c96_iso_teacher_checkpoint.pth",
+    "med3dino_rel_96": "/path/to/checkpoints/med3dino_rel/c96_rel_teacher_checkpoint.pth",
+    "med3dino_sa_96": "/path/to/checkpoints/med3dino_sa/c96_sa_teacher_checkpoint.pth"
+  },
+  "device": "cuda:0",
+  "pca": {
+    "cases": [
+      {
+        "modality": "CT",
+        "image": "example_cases/CT/case_00005_ct.nii.gz",
+        "mask": "example_cases/CT/case_00005_mask.nii.gz"
+      },
+      {
+        "modality": "MR",
+        "image": "example_cases/MR/BraTS-GLI-00002-000-t2f.nii.gz",
+        "mask": "example_cases/MR/BraTS-GLI-00002-000-seg.nii.gz"
+      }
+    ],
+    "output_dir": "../workspace/visualizations/ct-mr-shared-v1",
+    "seed": 42,
+    "crop": {
+      "fov_mm": 192.0
+    }
+  },
+  "similarity": {
+    "cases": [
+      {
+        "id": "CT",
+        "modality": "CT",
+        "image": "example_cases/CT/case_00005_ct.nii.gz",
+        "mask": "example_cases/CT/case_00005_mask.nii.gz",
+        "reference_ras_mm": [
+          -393.3763020833333,
+          -286.4427083333333,
+          -152.08333333333334
+        ],
+        "display_window": [
+          -160,
+          240
+        ]
+      },
+      {
+        "id": "MR",
+        "modality": "MR",
+        "image": "example_cases/MR/BraTS-GLI-00002-000-t2f.nii.gz",
+        "mask": "example_cases/MR/BraTS-GLI-00002-000-seg.nii.gz",
+        "reference_ras_mm": [
+          -151.0,
+          136.0,
+          78.0
+        ]
+      },
+      {
+        "id": "CT-additional",
+        "modality": "CT",
+        "image": "example_cases/CT/case_00001/case_00001_ct.nii.gz",
+        "mask": "example_cases/CT/case_00001/case_00001_mask.nii.gz",
+        "reference_ras_mm": [
+          -107.841796875,
+          -197.310546875,
+          -150.5
+        ],
+        "display_window": [
+          -160,
+          240
+        ]
+      },
+      {
+        "id": "MR-additional",
+        "modality": "MR",
+        "image": "example_cases/MR/BraTS-GLI-00003-000/BraTS-GLI-00003-000-t2f.nii.gz",
+        "mask": "example_cases/MR/BraTS-GLI-00003-000/BraTS-GLI-00003-000-seg.nii.gz",
+        "reference_ras_mm": [
+          -135.0,
+          132.0,
+          100.0
+        ]
+      }
+    ],
+    "memory_fraction": 0.8,
+    "max_axis": 224,
+    "max_patches": 2744,
+    "output_dir": "../workspace/visualizations/ct-mr-full-volume-v1"
+  }
+}

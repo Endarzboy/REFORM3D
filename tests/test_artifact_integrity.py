@@ -72,7 +72,7 @@ def test_resume_rejects_altered_completed_artifact(tmp_path, monkeypatch, artifa
         payload["balanced_cross_modal_retrieval"]["bidirectional_mean"]["map"] = 0.95
         path.write_text(json.dumps(payload))
     else:
-        path = next((Path(cfg["workspace"]) / "features").rglob("organ_features.npz"))
+        path = Path(state["completed"][0]["feature_path"])
         with np.load(path) as data:
             ids, features = data["sample_ids"].copy(), data["features"].copy()
         features[0, 0] += 0.25

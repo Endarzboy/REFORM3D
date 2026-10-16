@@ -44,6 +44,7 @@ Thumbs.db
 /results/
 /outputs/
 /logs/
+/tables/
 *.pth
 *.pt
 *.ckpt
@@ -61,14 +62,30 @@ Thumbs.db
 
 # Private manuscript results and migration archives
 /reference_results/
-/reproduction/audit.json
-/reproduction/provenance.json
-/reproduction/result_provenance.json
-/reproduction/regenerate_tables.py
-/reproduction/validation.json
-/reproduction/export_manifest.json
-/reproduction/pretraining/
+/docs/reference_results/
+/reproduction/
+# /reproduction/local-review/
+# /reproduction/audit.json
+# /reproduction/provenance.json
+# /reproduction/result_provenance.json
+# /reproduction/regenerate_tables.py
+# /reproduction/validation.json
+# /reproduction/export_manifest.json
+# /reproduction/pretraining/
+/validation/README.md
+/validation/summary.json
 /validation/two_dataset_reproduction.json
 /validation/two_dataset_reproduction.md
 /reproduction/package_inventory.json
 /reproduction/model_export_manifest.json
+
+# Local working notes and evaluation configurations
+/AGENTS.md
+/docs/retention_plan.md
+/reproduction/retention_plan.json
+/reproduction/retention_plan.csv
+/configs/kits23.yaml
+/configs/mmwhs.yaml
+
+# Separately maintained project website
+/docs/reform3d-website/

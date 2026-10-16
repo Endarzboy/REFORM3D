@@ -313,7 +313,6 @@ def _samples_from_binary_organ_cases(
     retained_organs: Iterable[str],
     *,
     source_dataset: str | None = None,
-    pretraining_exposure: str | None = None,
 ) -> List[Dict[str, Any]]:
     retained = set(retained_organs)
     samples: List[Dict[str, Any]] = []
@@ -341,8 +340,6 @@ def _samples_from_binary_organ_cases(
             }
             if case.get("mask_loader"):
                 sample["mask_loader"] = case["mask_loader"]
-            if pretraining_exposure:
-                sample["pretraining_exposure"] = pretraining_exposure
             samples.append(sample)
     return sorted(samples, key=lambda sample: (sample["primary_organ"], sample["modality"], sample["source_case_id"]))
 
@@ -446,7 +443,6 @@ def _samples_from_multiclass_cases(
     retained_organs: Sequence[str],
     label_map: Dict[int, str],
     source_dataset: str,
-    pretraining_exposure: str,
 ) -> List[Dict[str, Any]]:
     label_value_by_organ = {organ: label_value for label_value, organ in label_map.items()}
     samples: List[Dict[str, Any]] = []
@@ -471,7 +467,6 @@ def _samples_from_multiclass_cases(
                     "source_case_id": case["case_id"],
                     "split": case.get("split"),
                     "evidence_type": evidence_type,
-                    "pretraining_exposure": pretraining_exposure,
                     "shape": case["shape"],
                     "spacing": case["spacing"],
                     "label_voxels": voxel_count,
@@ -494,7 +489,6 @@ def build_mmwhs_manifest(dataset_root: Path, min_voxels: int, min_samples_per_mo
         retained_organs=retained_organs,
         label_map=MMWHS_LABELS,
         source_dataset="mmwhs",
-        pretraining_exposure="pretraining_unseen_source",
     )
     full, sampled = _manifest_payload(
         dataset_name=MMWHS_DATASET_NAME,
@@ -625,7 +619,6 @@ def build_amos22_manifest(
         retained_organs=retained_organs,
         label_map=AMOS22_LABELS,
         source_dataset="amos22",
-        pretraining_exposure="pretraining_unseen_source",
     )
     full, sampled = _manifest_payload(
         dataset_name=AMOS22_DATASET_NAME,
@@ -877,7 +870,6 @@ def build_chaos_manifest(dataset_root: Path, min_voxels: int, min_samples_per_mo
         cases,
         retained_organs,
         source_dataset="chaos",
-        pretraining_exposure="pretraining_unseen_source",
     )
     full, sampled = _manifest_payload(
         dataset_name=CHAOS_DATASET_NAME,

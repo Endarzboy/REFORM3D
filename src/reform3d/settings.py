@@ -104,12 +104,15 @@ def load_settings(path):
 
 
 def configure_environment(cfg):
+    from .workspace import manifest_directory, run_directory
     workspace = Path(cfg['workspace'])
-    values = {'MED3DINO_CHECKPOINT_ROOT': cfg['checkpoint_root'], 'MED3DINO_EXTERNAL_DATA_ROOT': cfg.get('data_root', workspace / 'data'), 'MED3DINO_SHARED_MANIFEST_ROOT': workspace / 'manifests', 'MED3DINO_SHARED_CACHE_ROOT': workspace / 'cache', 'MED3DINO_SHARED_RESULT_ROOT': workspace / 'runs', 'REFORM3D_WORKSPACE': workspace, 'REFORM3D_RUN_DIR': workspace / 'runs' / cfg['run_name']}
+    values = {'MED3DINO_CHECKPOINT_ROOT': cfg['checkpoint_root'], 'MED3DINO_EXTERNAL_DATA_ROOT': cfg.get('data_root', workspace / 'data'), 'MED3DINO_SHARED_MANIFEST_ROOT': manifest_directory(cfg), 'MED3DINO_SHARED_CACHE_ROOT': workspace / 'cache' / cfg['dataset'], 'MED3DINO_SHARED_RESULT_ROOT': workspace / 'runs' / cfg['dataset'], 'REFORM3D_WORKSPACE': workspace, 'REFORM3D_RUN_DIR': run_directory(cfg), 'REFORM3D_DATASET': cfg['dataset']}
     for key, value in values.items():
         os.environ[key] = str(value)
     os.environ.pop('MED3DINO_REPO_ROOT', None)
     os.environ.pop('MED3DINO_REFORM3D_ACTIVE_SEED', None)
+    for key in ('REFORM3D_ENCODER_DIR', 'REFORM3D_CACHE_DIR'):
+        os.environ.pop(key, None)
     return Path(values['REFORM3D_RUN_DIR'])
 
 

@@ -19,7 +19,7 @@ reform3d run --config configs/mmwhs-demo.yaml
 
 The examples use REL/SA-96, CLS features, and seed 42. For repeated-seed evaluation, set `seeds: [42, 123, 456]`. Configure additional checkpoints and readouts explicitly; external encoders use their dedicated adapters. See [Encoders](encoders.md).
 
-The [experiment definitions](../reproduction/experiments.json) describe reference cohorts, fold assignments, and retrieval pools: 69 controlled KiTS23 cases from a 489-case cohort, and 40 MMWHS source cases with 280 organ samples. The runner reads YAML configurations; it does not load this JSON as execution settings. Preserve case order, semantic-label eligibility, spacing variants, support/query assignments, checkpoint identity, and feature readout when comparing runs.
+The runner reads the YAML configuration and prepared manifest. Preserve case order, semantic-label eligibility, spacing variants, support/query assignments, retrieval pools, checkpoint identity, and feature readout when comparing runs. Use the saved manifest and module result files to inspect the evaluated cohort and protocol.
 
 Record Python/library versions, precision, extraction batch size, device/backend, and numerical thread settings. Give each changed experiment a new run name; completed outputs are checked before reuse. [Usage](usage.md) describes the directory layout and cache rules.
 

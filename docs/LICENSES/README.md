@@ -1,6 +1,6 @@
 # Source notices
 
-This directory preserves license evidence found in the local source snapshot. It does not assign a new blanket project or checkpoint license.
+The root [LICENSE](../../LICENSE) contains the Apache License 2.0 text. This directory preserves the separately recorded component and checkpoint terms, including original source headers; it does not replace those terms with a blanket license.
 
 | Component | Locally recorded terms | Evidence |
 | --- | --- | --- |

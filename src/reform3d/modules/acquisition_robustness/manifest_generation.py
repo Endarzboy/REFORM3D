@@ -499,8 +499,8 @@ def scan_dataset(
         # Also check subdirectories
         nifti_files.extend(config.path.glob(f"**/{config.file_pattern}"))
 
-    # Remove duplicates
-    nifti_files = list(set(nifti_files))
+    # Keep record order and floating-point summaries stable across processes.
+    nifti_files = sorted(set(nifti_files))
 
     logger.info(f"Found {len(nifti_files)} NIfTI files in {config.name}")
 

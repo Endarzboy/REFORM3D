@@ -9,6 +9,9 @@ native-spacing acquisition metrics currently shown in the benchmark tables:
 - observational CKA: ``representation_geometry.json -> cka_stats.mean_cross_cka``
 - observational semantic transfer: ``semantic_transfer.json -> cross_bin_accuracy``
 
+Native bins contain different cases. Their CKA is an observational comparison,
+not matched-case robustness under controlled spacing changes.
+
 Examples:
     python -m reform3d.modules.acquisition_robustness.native_uncertainty_analysis \
         --analysis-names abdomenatlas kits23 imagecas totalsegmentermri jhu_stroke \
@@ -167,8 +170,8 @@ def _resolve_crop_size(checkpoint_name: str) -> int:
 
 def _manifest_variant_from_metric_path(metric_path: Path) -> str:
     relative_parts = metric_path.relative_to(OUTPUTS_ROOT).parts
-    if len(relative_parts) >= 3:
-        return str(relative_parts[2])
+    if len(relative_parts) >= 6:
+        return str(Path(*relative_parts[1:-4]))
     return DEFAULT_MANIFEST_VARIANT
 
 
@@ -181,13 +184,13 @@ def _discover_metric_jsons(
     feature_filter = set(feature_types or [])
     checkpoint_filter = set(checkpoints or [])
     metric_paths: list[Path] = []
-    for metric_path in sorted(OUTPUTS_ROOT.glob("*/*/results/*/*/representation_geometry.json")):
+    for metric_path in sorted(OUTPUTS_ROOT.glob("**/results/*/*/representation_geometry.json")):
         relative_parts = metric_path.relative_to(OUTPUTS_ROOT).parts
-        if len(relative_parts) < 7:
+        if len(relative_parts) < 6:
             continue
         analysis_name = str(relative_parts[0])
-        checkpoint_name = str(relative_parts[4])
-        feature_type = str(relative_parts[5])
+        checkpoint_name = metric_path.parent.parent.name
+        feature_type = metric_path.parent.name
         if analysis_filter and analysis_name not in analysis_filter:
             continue
         if feature_filter and feature_type not in feature_filter:
@@ -247,51 +250,12 @@ def _resolve_feature_cache_path(
     return None, "missing_feature_cache"
 
 
-def _center_features(features: np.ndarray) -> np.ndarray:
-    values = np.asarray(features, dtype=np.float64)
-    return values - values.mean(axis=0, keepdims=True)
-
-
-def _linear_cka_gram(source_features: np.ndarray, target_features: np.ndarray) -> float:
-    source_centered = _center_features(source_features)
-    target_centered = _center_features(target_features)
-    numerator = np.linalg.norm(source_centered @ target_centered.T, ord="fro") ** 2
-    source_scale = np.linalg.norm(source_centered @ source_centered.T, ord="fro")
-    target_scale = np.linalg.norm(target_centered @ target_centered.T, ord="fro")
-    denominator = source_scale * target_scale
-    if denominator <= 1e-12:
-        return 0.0
-    return float(numerator / denominator)
-
-
-def _linear_cka_feature(source_features: np.ndarray, target_features: np.ndarray) -> float:
-    source_centered = _center_features(source_features)
-    target_centered = _center_features(target_features)
-    source_covariance = source_centered.T @ source_centered
-    target_covariance = target_centered.T @ target_centered
-    numerator = float(np.sum(source_covariance * target_covariance))
-    source_scale = np.linalg.norm(source_covariance, ord="fro")
-    target_scale = np.linalg.norm(target_covariance, ord="fro")
-    denominator = source_scale * target_scale
-    if denominator <= 1e-12:
-        return 0.0
-    return float(numerator / denominator)
-
-
 def _linear_cka(source_features: np.ndarray, target_features: np.ndarray, method: str = "gram") -> float:
-    if method == "gram":
-        return _linear_cka_gram(source_features, target_features)
-    if method == "feature":
-        return _linear_cka_feature(source_features, target_features)
-    if method == "auto":
-        source = np.asarray(source_features)
-        target = np.asarray(target_features)
-        n_cases = max(int(source.shape[0]), int(target.shape[0]))
-        feature_dim = max(int(source.shape[1]), int(target.shape[1]))
-        if feature_dim <= n_cases:
-            return _linear_cka_feature(source_features, target_features)
-        return _linear_cka_gram(source_features, target_features)
-    raise ValueError(f"Unsupported CKA method: {method}")
+    try:
+        from .representation_geometry_analysis import centered_linear_cka
+    except ImportError:  # pragma: no cover - direct script execution
+        from representation_geometry_analysis import centered_linear_cka
+    return centered_linear_cka(source_features, target_features, method=method)
 
 
 def _compute_observational_mean_cross_cka(
@@ -633,8 +597,8 @@ def _analyze_metric_path(
 ) -> Dict[str, Any]:
     relative_parts = metric_path.relative_to(OUTPUTS_ROOT).parts
     analysis_name = str(relative_parts[0])
-    checkpoint_name = str(relative_parts[4])
-    feature_type = str(relative_parts[5])
+    checkpoint_name = metric_path.parent.parent.name
+    feature_type = metric_path.parent.name
     manifest_variant = _manifest_variant_from_metric_path(metric_path)
     semantic_transfer_path = metric_path.with_name("semantic_transfer.json")
 

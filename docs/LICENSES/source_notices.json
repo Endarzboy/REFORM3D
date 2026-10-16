@@ -34,7 +34,7 @@
     "sha256": "afc276456f86dd5b027fa859559eb802a7ff5e80c6797dae4dc599855822872f",
     "source": "reform3d_eval/external_methods/openmind/PrimusM-OpenMind-VoCo/README.md"
   },
-  "project_license": "not assigned by this export",
+  "project_license": "See root LICENSE; component notices and checkpoint terms are recorded separately.",
   "schema_version": 1,
   "source_headers": [
     {

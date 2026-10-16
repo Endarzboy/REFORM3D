@@ -5,6 +5,7 @@ import json
 from dataclasses import asdict, replace
 from pathlib import Path
 from .settings import digest, write_json
+from .workspace import manifest_directory
 
 PATH_FIELDS = ('file_path', 'mask_path', 'label_path')
 
@@ -51,7 +52,7 @@ def prepare_manifest(cfg):
         images = root / 'images' if (root / 'images').is_dir() else root
         labels = Path(cfg['label_root']) if cfg.get('label_root') else (root / 'masks' if (root / 'masks').is_dir() else old.label_path)
         ac.RAW_DATASETS[cfg['dataset']] = replace(old, path=images, label_path=labels, file_pattern=cfg.get('file_pattern', old.file_pattern), is_enabled=True)
-        staging = workspace / 'manifests' / (cfg['dataset'] + '-scan')
+        staging = manifest_directory(cfg) / 'scan'
         build_single_dataset_manifest(cfg['dataset'], cfg['dataset'], validate_integrity=True, seed=cfg['seeds'][0], output_dir=staging)
         payload = json.loads((staging / 'manifest_sampled.json').read_text())
     else:
@@ -186,7 +187,7 @@ def prepare_manifest(cfg):
     payload['dataset'] = cfg['dataset']
     payload['manifest_variant'] = payload.get('manifest_variant', 'core' if 'samples' in payload else 'original_bins')
     identity = digest({'payload': payload, 'files': fingerprints})
-    path = workspace / 'manifests' / f"{cfg['dataset']}-{identity[:16]}.json"
+    path = manifest_directory(cfg) / f"{cfg['dataset']}-{identity[:16]}.json"
     write_json(path, payload)
     write_json(path.with_suffix('.provenance.json'), {'manifest_hash': identity, 'fingerprint_policy': 'resolved paths, file sizes and nanosecond modification times; headers validated', 'files': fingerprints, 'records': len(records)})
     return path, payload, identity

@@ -15,7 +15,6 @@ __all__ = [
     "retrieval_uncertainty_analysis",
     "retrieval_diagnostics",
     "run_cross_modal_alignment",
-    "run_evaluation_extensions",
     "single_organ_alignment",
     "single_organ_retrieval_uncertainty",
 ]

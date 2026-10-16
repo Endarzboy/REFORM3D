@@ -1,31 +1,12 @@
 #!/usr/bin/env python
-"""
-Pre-generate controlled-perturbation caches for acquisition manifests.
+"""Optionally prewarm controlled-spacing inputs for the direct acquisition runner.
 
-This should be run once per dataset/manifest-variant pair before running
-controlled perturbation evaluations. Cached runs avoid repeated resampling work.
+    python -m reform3d.modules.acquisition_robustness.build_perturbation_cache \
+        --manifest /path/to/manifest.json --crop-size 96 112
 
-Usage:
-    python build_perturbation_cache.py \
-        -m abdomenatlas/original_bins/manifest_sampled.json \
-        --crop-size 96 112
-
-    python build_perturbation_cache.py \
-        -m abdomenatlas/coarse_bins/manifest_sampled.json \
-        --crop-size 96 112
-
-    python build_perturbation_cache.py \
-        -m totalsegmenter_ct/original_bins/manifest_sampled.json \
-        --crop-size 96 112
-
-The cache will be stored in:
-    ../caches/acquisition_robustness/{dataset}/{manifest_variant}/crop{96,112}/{cache_signature}/
-
-This script is memory-efficient:
-- processes only uncached volumes
-- does not accumulate volumes in memory
-- saves plain tensors for faster reloads
-- is safe to restart because cached items are skipped
+The direct runner's configured cache root and protocol signature determine the
+output location. The YAML workflow prepares its own geometry caches on demand.
+Volumes are processed individually; compatible cached volumes are reused.
 """
 
 import argparse
@@ -35,8 +16,6 @@ import sys
 import logging
 from pathlib import Path
 from tqdm import tqdm
-
-# Add project root to path for direct script execution.
 
 try:
     from .perturbation_robustness_analysis import (

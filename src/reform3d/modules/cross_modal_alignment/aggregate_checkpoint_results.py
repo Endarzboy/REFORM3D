@@ -50,17 +50,6 @@ def _write_json(path: Path, payload: Dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _archive_root_primary_metrics(results_dir: Path) -> str | None:
-    root_metrics_path = results_dir / "primary_metrics.json"
-    if not root_metrics_path.exists():
-        return None
-
-    archived_path = results_dir / "primary_metrics.previous_root.json"
-    archived_path.write_text(root_metrics_path.read_text(encoding="utf-8"), encoding="utf-8")
-    root_metrics_path.unlink()
-    return str(archived_path)
-
-
 def _checkpoint_family(checkpoint_name: str) -> str:
     return resolve_checkpoint_config(checkpoint_name).model_family
 
@@ -277,8 +266,6 @@ def main() -> None:
         source_results_dir = get_existing_results_root(args.analysis_name, args.manifest_variant)
         output_results_dir = get_output_paths(args.analysis_name, args.manifest_variant)["results"]
 
-    archived_root_metrics = _archive_root_primary_metrics(output_results_dir) if feature_type == "cls" else None
-
     if args.analysis_name == CHAOS_CROSS_MODAL_DATASET:
         rows = _collect_single_organ_rows(source_results_dir, feature_type)
         aggregation_source = SINGLE_ORGAN_ALIGNMENT_FILE_NAME
@@ -303,7 +290,6 @@ def main() -> None:
             "summary_output_dir": str(output_results_dir),
             "aggregation_source": aggregation_source,
             "n_checkpoints": len(ranked_rows),
-            "archived_stale_root_primary_metrics": archived_root_metrics,
             "rows": ranked_rows,
             "best_by_mean_margin": _best_row(ranked_rows, "mean_margin"),
             "best_by_retrieval_top@1": _best_row(ranked_rows, "retrieval_top@1"),
@@ -314,8 +300,6 @@ def main() -> None:
         },
     )
 
-    if archived_root_metrics:
-        print(f"Archived stale root metrics to {archived_root_metrics}")
     print(f"Wrote CSV summary to {csv_path}")
     print(f"Wrote JSON summary to {json_path}")
 

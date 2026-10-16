@@ -4,7 +4,7 @@
 
 The runner builds the selected manifest, extracts organ embeddings for each
 checkpoint and feature family, runs alignment metrics, aggregates checkpoint
-results, and optionally computes uncertainty and geometry summaries.
+results, and optionally computes uncertainty summaries.
 
 Inputs:
     --dataset: CT/MR dataset surface such as ``amos22_ct_mr``.
@@ -139,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--fast-seeded-evaluation",
         action="store_true",
         help=(
-            "Skip repeated uncertainty and geometry diagnostics during seeded sweeps "
+            "Skip repeated uncertainty diagnostics during seeded sweeps "
             "while keeping primary retrieval metrics for seed summaries."
         ),
     )
@@ -148,7 +148,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--skip-evaluation", action="store_true")
     parser.add_argument("--skip-aggregation", action="store_true")
     parser.add_argument("--skip-uncertainty", action="store_true")
-    parser.add_argument("--skip-geometry", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--python", default=sys.executable)
     args = parser.parse_args(argv)
@@ -159,7 +158,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     feature_types = [normalize_feature_type(feature_type) for feature_type in args.feature_types]
     bootstrap_resamples = 0 if args.fast_seeded_evaluation else args.bootstrap_resamples
     skip_uncertainty = args.skip_uncertainty or args.fast_seeded_evaluation
-    skip_geometry = args.skip_geometry or args.fast_seeded_evaluation
     uses_single_organ_alignment = _uses_single_organ_alignment(dataset_name)
     output_paths = get_output_paths(dataset_name, manifest_variant)
 
@@ -338,23 +336,6 @@ def main(argv: Sequence[str] | None = None) -> None:
                     ),
                     args.dry_run,
                 )
-
-    if not skip_geometry:
-        _run(
-            _python_module_command(
-                args.python,
-                "reform3d.modules.explanatory_geometry.cross_modal_geometry",
-                "--analysis-name",
-                dataset_name,
-                "--manifest-variant",
-                manifest_variant,
-                "--checkpoints",
-                *checkpoints,
-                "--feature-types",
-                *feature_types,
-            ),
-            args.dry_run,
-        )
 
 
 if __name__ == "__main__":

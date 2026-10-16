@@ -78,22 +78,9 @@ def _build_holdout_eligibility_rule(
     }
 
 
-def _infer_surface_stratum(samples: Sequence[Dict[str, Any]], required_modalities: Sequence[str]) -> str:
-    if len(required_modalities) == 1:
-        return f"{required_modalities[0]}_within_dataset_holdout_surface"
-    exposures = {sample.get("pretraining_exposure") for sample in samples if sample.get("pretraining_exposure")}
-    if exposures == {"pretraining_unseen_source"}:
-        return "pretraining_unseen_ct_mr_validation"
-    if "pretraining_seen_source" in exposures and "pretraining_unseen_source" in exposures:
-        return "mixed_exposure_ct_mr_anchor"
-    if exposures == {"pretraining_seen_source"}:
-        return "pretraining_seen_ct_mr_surface"
-    return "mixed_or_unknown_exposure_surface"
-
-
 def _build_serialized_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
     raw_sample = sample.get("raw_sample") or {}
-    return {
+    serialized_sample = {
         "sample_id": sample.get("sample_id"),
         "patient_id": sample.get("patient_id"),
         "modality": sample.get("modality"),
@@ -101,7 +88,6 @@ def _build_serialized_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
         "organ_family": sample.get("organ_family"),
         "organ_status": sample.get("organ_status") or "holdout_candidate",
         "source_dataset": sample.get("source_dataset") or sample.get("dataset"),
-        "pretraining_exposure": sample.get("pretraining_exposure"),
         "evidence_type": sample.get("evidence_type"),
         "image_path": sample.get("image_path") or sample.get("file_path"),
         "mask_path": sample.get("mask_path"),
@@ -118,6 +104,9 @@ def _build_serialized_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
         "shape": raw_sample.get("shape"),
         "spacing": raw_sample.get("spacing"),
     }
+    if sample.get("pretraining_exposure"):
+        serialized_sample["pretraining_exposure"] = sample["pretraining_exposure"]
+    return serialized_sample
 
 
 def build_anatomical_manifest(
@@ -185,7 +174,7 @@ def build_anatomical_manifest(
     serialized_samples = [_build_serialized_sample(sample) for sample in filtered_samples]
     source_summary = summarize_anatomical_manifest(filtered_samples)
     surface_scope = "within_modality" if len(modalities) == 1 else "cross_modality"
-    surface_stratum = _infer_surface_stratum(filtered_samples, modalities)
+    surface_stratum = f"{'_'.join(modalities)}_case_disjoint_target_transfer"
     holdout_eligibility_rule = _build_holdout_eligibility_rule(modalities, min_samples_per_modality)
     anatomical_protocol = {
         "target_definition": "low_shot_target_organ",

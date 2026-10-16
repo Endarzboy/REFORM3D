@@ -179,6 +179,41 @@ def cka_linear(X: np.ndarray, Y: np.ndarray) -> float:
     return hsic_kl / np.sqrt(hsic_kk * hsic_ll)
 
 
+def centered_linear_cka(X: np.ndarray, Y: np.ndarray, method: str = "auto") -> float:
+    """Compute linear CKA efficiently for bootstrap samples with paired rows.
+
+    The Gram and feature backends are algebraically equivalent to ``cka_linear``.
+    They avoid explicitly multiplying centering matrices for each resample.
+    """
+    X = np.asarray(X, dtype=np.float64)
+    Y = np.asarray(Y, dtype=np.float64)
+    if X.ndim != 2 or Y.ndim != 2 or X.shape[0] != Y.shape[0]:
+        raise ValueError("CKA requires two feature matrices with the same number of rows")
+    if not np.isfinite(X).all() or not np.isfinite(Y).all():
+        raise ValueError("CKA features must be finite")
+    if method not in {"auto", "gram", "feature"}:
+        raise ValueError(f"Unsupported CKA method: {method}")
+    n = X.shape[0]
+    if n < 2 or not X.shape[1] or not Y.shape[1]:
+        return 0.0
+    X = X - X.mean(axis=0, keepdims=True)
+    Y = Y - Y.mean(axis=0, keepdims=True)
+    if method == "auto":
+        method = "feature" if max(X.shape[1], Y.shape[1]) <= n else "gram"
+    if method == "gram":
+        K, L = X @ X.T, Y @ Y.T
+        numerator = float(np.sum(K * L))
+        source_scale, target_scale = np.linalg.norm(K, "fro"), np.linalg.norm(L, "fro")
+    else:
+        numerator = float(np.linalg.norm(X.T @ Y, "fro") ** 2)
+        source_scale = np.linalg.norm(X.T @ X, "fro")
+        target_scale = np.linalg.norm(Y.T @ Y, "fro")
+    # Match the primary evaluator's HSIC self-similarity threshold.
+    if (source_scale / (n - 1)) ** 2 < 1e-10 or (target_scale / (n - 1)) ** 2 < 1e-10:
+        return 0.0
+    return float(numerator / (source_scale * target_scale))
+
+
 def cka_rbf(X: np.ndarray, Y: np.ndarray, sigma: float = None) -> float:
     """
     Compute RBF kernel CKA between two feature matrices.

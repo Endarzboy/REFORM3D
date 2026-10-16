@@ -10,6 +10,7 @@ from torch import nn
 from reform3d.encoders.checkpoints import load_encoder_state
 from reform3d.prepare import prepare_manifest
 from reform3d.settings import load_settings
+from reform3d.workspace import run_directory
 
 
 def test_encoder_requires_every_backbone_weight():
@@ -155,7 +156,7 @@ def test_check_preserves_completed_run_state(tmp_path, monkeypatch):
     checkpoint.write_bytes(b'weights')
     monkeypatch.setattr(cli, '_checkpoints', lambda _: [SimpleNamespace(checkpoint_key='test', path=checkpoint)])
     cli.run(cfg, dry_run=True)
-    path = Path(cfg['workspace']) / 'runs' / cfg['run_name'] / 'run.json'
+    path = run_directory(cfg) / 'run.json'
     state = json.loads(path.read_text())
     state['status'] = 'complete'
     state['completed'] = [{'module': 'anatomical', 'seed': 42}]
@@ -175,7 +176,7 @@ def test_unavailable_cuda_records_failed_state(tmp_path, monkeypatch):
     monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
     with pytest.raises(RuntimeError, match='CUDA'):
         cli.run(cfg)
-    state = json.loads((Path(cfg['workspace']) / 'runs' / cfg['run_name'] / 'run.json').read_text())
+    state = json.loads((run_directory(cfg) / 'run.json').read_text())
     assert state['status'] == 'failed'
     assert 'CUDA' in state['error']
 
@@ -252,9 +253,8 @@ def test_unsupported_checkpoint_variants_are_rejected(variant, size):
             resolve_checkpoint_config(name)
 
 
-def test_analysis_defaults_are_registered():
+def test_acquisition_runner_defaults_are_registered():
     from reform3d.core.checkpoints import resolve_checkpoint_config
-    from reform3d.modules.acquisition_robustness.acquisition_protocol_stability_analysis import DEFAULT_CHECKPOINTS as acquisition
-    from reform3d.modules.cross_modal_alignment.region_definition_stability import DEFAULT_CHECKPOINTS as region
-    for name in (*acquisition, *region):
-        assert resolve_checkpoint_config(name).crop_size == 96
+    from reform3d.modules.acquisition_robustness.run_acquisition_robustness import DEFAULT_CHECKPOINTS
+    for name in DEFAULT_CHECKPOINTS:
+        assert resolve_checkpoint_config(name).checkpoint_key == name

@@ -282,3 +282,52 @@ def test_per_volume_geometry_cache_remains_shared_across_cohort_limits():
     first = ControlledPerturbationConfig(n_source_volumes=3)
     assert first.cache_signature() == replace(first, n_source_volumes=10).cache_signature()
     assert first.cache_signature() == replace(first, n_source_volumes=None).cache_signature()
+
+
+def test_binary_nearest_centroid_separable():
+    from reform3d.modules.anatomical_generalization.few_shot_transfer_analysis import _predict_nearest_centroid
+
+    rng = np.random.default_rng(0)
+    pos = rng.normal(5.0, 0.1, size=(20, 4))
+    neg = rng.normal(-5.0, 0.1, size=(20, 4))
+    train = np.vstack([neg, pos])
+    labels = np.array([0] * 20 + [1] * 20)
+    test = np.vstack([rng.normal(5.0, 0.1, size=(5, 4)), rng.normal(-5.0, 0.1, size=(5, 4))])
+    expected = np.array([1] * 5 + [0] * 5)
+    predictions = _predict_nearest_centroid(train, labels, test)
+    assert np.array_equal(predictions, expected)
+
+
+def test_matched_semantic_folds_are_deterministic():
+    from reform3d.modules.acquisition_robustness.perturbation_robustness_analysis import _build_matched_split_indices
+
+    labels = np.random.default_rng(3).integers(0, 2, size=(60, 4))
+    folds_a = _build_matched_split_indices(labels, n_splits=5, random_state=42)
+    folds_b = _build_matched_split_indices(labels, n_splits=5, random_state=42)
+    assert len(folds_a) == len(folds_b) == 5
+    for (tr_a, te_a), (tr_b, te_b) in zip(folds_a, folds_b):
+        assert np.array_equal(tr_a, tr_b) and np.array_equal(te_a, te_b)
+
+
+def test_support_query_construction_deterministic():
+    from reform3d.modules.anatomical_generalization.few_shot_transfer_analysis import (
+        _build_case_disjoint_support_and_query_sets,
+        _group_by_organ_and_modality,
+    )
+    records = []
+    for organ in ("a", "b"):
+        for modality in ("ct", "mr"):
+            for case in range(6):
+                records.append({
+                    "sample_id": f"{organ}_{modality}_{case}",
+                    "primary_organ": organ, "modality": modality,
+                    "source_case_id": f"{modality}_{case}",
+                })
+    grouped = _group_by_organ_and_modality(records, ("ct", "mr"))
+    out1 = _build_case_disjoint_support_and_query_sets(grouped, ["a", "b"], ("ct", "mr"), 2, None, np.random.default_rng(42))
+    out2 = _build_case_disjoint_support_and_query_sets(grouped, ["a", "b"], ("ct", "mr"), 2, None, np.random.default_rng(42))
+    ids1 = [r["sample_id"] for r in out1[0]], [r["sample_id"] for r in out1[1]]
+    ids2 = [r["sample_id"] for r in out2[0]], [r["sample_id"] for r in out2[1]]
+    assert ids1 == ids2
+    # Support and query cases are disjoint.
+    assert not (set(r["source_case_id"] for r in out1[0]) & set(r["source_case_id"] for r in out1[1]))

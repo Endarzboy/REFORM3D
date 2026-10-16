@@ -1,7 +1,6 @@
-"""Regression checks for the standalone package and retained analysis entrypoints."""
+"""Dependency boundaries and crop-cache integrity checks."""
 from __future__ import annotations
 
-import importlib
 import json
 import os
 from pathlib import Path
@@ -9,58 +8,6 @@ import subprocess
 import sys
 
 import pytest
-
-
-@pytest.mark.parametrize(
-    "module",
-    [
-        "region_definition_stability",
-        "region_definition_stability_analysis",
-        "organ_granularity_stability",
-        "organ_granularity_stability_analysis",
-    ],
-)
-def test_stability_entrypoints_import(module):
-    importlib.import_module(f"reform3d.modules.cross_modal_alignment.{module}")
-
-
-@pytest.mark.parametrize("versions", [{}, {"preprocess_version": "recorded-v1", "sample_signature_version": "recorded-v2"}])
-def test_baseline_reference_reports_only_recorded_cache_versions(tmp_path, monkeypatch, versions):
-    from reform3d.modules.cross_modal_alignment import region_definition_stability as region
-    from reform3d.modules.cross_modal_alignment.feature_extractor import OrganSample, _sample_signature
-
-    source = tmp_path / "source-cache"
-    source.mkdir()
-    manifest = tmp_path / "manifest.json"
-    case = source / "case.pt"
-    sample = OrganSample("sample", tmp_path / "image.nii.gz", tmp_path / "mask.nii.gz", "ct", "organ", "case", (1.0, 1.0, 1.0))
-    sample.file_path.write_bytes(b"image")
-    sample.mask_path.write_bytes(b"mask")
-    index = {
-        "sample_signature": _sample_signature([sample]),
-        "manifest_path": str(manifest),
-        "crop_size": 96,
-        "bbox_margin": 5,
-        "min_mask_voxels": 100,
-        "outside_organ_mask": "none",
-        "n_requested_samples": 1,
-        "n_cached_samples": 1,
-        "cases": [{"source_case_id": "case", "case_cache_path": str(case)}],
-        **versions,
-    }
-    (source / region.CROP_CACHE_INDEX_NAME).write_text(json.dumps(index))
-    destination = tmp_path / "reference.json"
-    monkeypatch.setattr(region, "get_crop_cache_dir", lambda *args: source)
-    monkeypatch.setattr(region, "_surface_index_path", lambda *args: destination)
-    monkeypatch.setattr(region, "_validate_case_payload", lambda *args, **kwargs: {"sample_ids": ["sample"]})
-
-    assert region._create_baseline_reference(
-        "mmwhs_ct_mr", samples=[sample], manifest_path=manifest,
-        manifest_sha256="manifest-hash", sample_signature="sample-hash", overwrite=False,
-    )
-    result = json.loads(destination.read_text())
-    assert result["source_cache_preprocess_version"] == versions.get("preprocess_version")
-    assert result["source_cache_sample_signature_version"] == versions.get("sample_signature_version")
 
 
 def test_acquisition_imports_do_not_inject_package_paths():
@@ -77,22 +24,6 @@ for name in ('feature_extractor', 'semantic_analysis', 'representation_geometry_
 assert package_paths() == before, (before, package_paths())
 """
     subprocess.run([sys.executable, "-I", "-c", code, package_parent], check=True, capture_output=True, text=True, timeout=60)
-
-
-def test_readout_logs_follow_configured_result_root(tmp_path):
-    import reform3d
-
-    package_parent = str(Path(reform3d.__file__).resolve().parent.parent)
-    result_root = tmp_path / "results"
-    code = """
-import sys
-from pathlib import Path
-sys.path.insert(0, sys.argv[1])
-from reform3d.modules.readout_sensitivity.config import LOG_ROOT
-assert LOG_ROOT == Path(sys.argv[2]) / 'readout_sensitivity' / 'logs', LOG_ROOT
-"""
-    env = {**os.environ, "MED3DINO_SHARED_RESULT_ROOT": str(result_root)}
-    subprocess.run([sys.executable, "-I", "-c", code, package_parent, str(result_root)], env=env, check=True, capture_output=True, text=True, timeout=60)
 
 
 @pytest.fixture

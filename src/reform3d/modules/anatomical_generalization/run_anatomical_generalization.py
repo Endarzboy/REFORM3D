@@ -198,7 +198,6 @@ def main(argv: Sequence[str] | None = None) -> None:
             str(args.seed),
             "--skip-aggregation",
             "--skip-uncertainty",
-            "--skip-geometry",
         )
         if args.fast_seeded_evaluation:
             command.append("--fast-seeded-evaluation")
