@@ -11,7 +11,7 @@
 
 REFORM-3D helps researchers compare **frozen 3D medical encoders before downstream adaptation**. It evaluates how representations respond to voxel spacing, align anatomy across CT and MR, and support organ recognition from a few labeled examples.
 
-![Three complementary frozen-encoder evaluation modules](docs/assets/reform3d_arch.png)
+![Three complementary frozen-encoder evaluation modules](docs/assets/reform3d_arch.pdf)
 
 | Module | Question | Primary metrics |
 |---|---|---|
