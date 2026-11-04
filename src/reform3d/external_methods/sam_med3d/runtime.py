@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict
@@ -11,7 +10,7 @@ import torch
 import torch.nn as nn
 
 from reform3d.core.paths import resolve_external_method_checkpoint_path
-from reform3d.external_methods._primary_feature import PrimaryFeatureMethod
+from reform3d.external_methods._primary_feature import PrimaryFeatureMethod, reference_checkpoint_sha256
 from reform3d.external_methods._sources import source_root, add_source_path
 
 
@@ -20,7 +19,6 @@ REGISTERED_CHECKPOINT_PATH = resolve_external_method_checkpoint_path(
     "sam_med3d",
     "sam_med3d_turbo.pth",
 )
-LOCAL_CHECKPOINT_PATH = SAM_MED3D_SOURCE_ROOT / "checkpoint" / "sam_med3d_turbo.pth"
 DEFAULT_CHECKPOINT_PATH = REGISTERED_CHECKPOINT_PATH
 DEFAULT_CHECKPOINT_NAME = "sam_med3d_turbo"
 DEFAULT_MODEL_NAME = "SAM-Med3D-turbo"
@@ -112,7 +110,9 @@ class SAMMed3DFeatureExtractor:
             input_size=DEFAULT_CROP_SIZE,
             checkpoint_path=str(checkpoint_path),
             source_commit=SOURCE_COMMIT,
-            checkpoint_sha256=CHECKPOINT_SHA256,
+            checkpoint_sha256=reference_checkpoint_sha256(
+                checkpoint_path, DEFAULT_CHECKPOINT_PATH, CHECKPOINT_SHA256,
+            ),
         )
 
     @torch.inference_mode()

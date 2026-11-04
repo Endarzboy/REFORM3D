@@ -10,7 +10,7 @@ Example:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
@@ -179,6 +179,11 @@ CHECKPOINTS: Dict[str, CheckpointConfig] = {
     ),
 }
 
+# Keep the registered layout independent of paths resolved for earlier runs.
+_CHECKPOINT_RELATIVE_PATHS = {
+    key: config.path.relative_to(CHECKPOINT_ROOT) for key, config in CHECKPOINTS.items()
+}
+
 
 def _normalize_name(name: str) -> str:
     return str(name).strip().lower().replace(" ", "_").replace("-", "_")
@@ -192,13 +197,18 @@ for checkpoint_key, checkpoint_config in CHECKPOINTS.items():
         ALIAS_TO_CHECKPOINT_KEY[_normalize_name(alias)] = checkpoint_key
 
 
-def resolve_checkpoint_config(checkpoint_name: str) -> CheckpointConfig:
+def resolve_checkpoint_config(
+    checkpoint_name: str, *, checkpoint_root: str | Path | None = None,
+) -> CheckpointConfig:
     normalized = _normalize_name(checkpoint_name)
     try:
-        return CHECKPOINTS[ALIAS_TO_CHECKPOINT_KEY[normalized]]
+        config = CHECKPOINTS[ALIAS_TO_CHECKPOINT_KEY[normalized]]
     except KeyError as exc:
         known = ", ".join(CHECKPOINTS[name].release_name for name in CHECKPOINT_ORDER)
         raise KeyError(f"Unknown checkpoint '{checkpoint_name}'. Known checkpoints: {known}") from exc
+    if checkpoint_root is not None:
+        config = replace(config, raw_checkpoint_path=Path(checkpoint_root) / _CHECKPOINT_RELATIVE_PATHS[config.checkpoint_key])
+    return config
 
 
 def checkpoint_dataset_size_label(checkpoint_name: str) -> str:

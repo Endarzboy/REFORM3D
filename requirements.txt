@@ -15,7 +15,6 @@ httpx2==2.13.1
 huggingface_hub==2.0.0
 idna==3.20
 importlib_resources==7.1.0
-iniconfig==2.3.0
 Jinja2==3.1.6
 joblib==1.6.0
 kiwisolver==1.5.1
@@ -40,10 +39,8 @@ nvidia-nvjitlink-cu12==12.9.86
 nvidia-nvtx-cu12==12.1.105
 packaging==26.3
 pillow==10.4.0
-pluggy==1.6.0
 Pygments==2.21.0
 pyparsing==3.3.3
-pytest==9.1.1
 python-dateutil==2.9.0.post0
 PyYAML==6.0.3
 safetensors==0.8.0

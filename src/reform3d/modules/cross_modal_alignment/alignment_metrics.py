@@ -16,12 +16,13 @@ from typing import Any, Dict, Sequence
 import numpy as np
 from tqdm import tqdm
 
+from .sampling import (eligible_samples, require_features, margin_selection,
+                       lisi_selection, validate_evaluation_plan)
+
 try:
     from sklearn.metrics import silhouette_score
-    from sklearn.neighbors import NearestNeighbors
 except ImportError:  # pragma: no cover
     silhouette_score = None
-    NearestNeighbors = None
 
 
 def _as_2d_array(features: np.ndarray | Sequence[Sequence[float]]) -> np.ndarray:
@@ -39,22 +40,6 @@ def _l2_normalize_vector(vector: np.ndarray | Sequence[float]) -> np.ndarray:
     if norm <= 0:
         return array
     return array / norm
-
-
-def _sample_ids(sample_ids: Sequence[str], sample_count: int, rng: np.random.Generator) -> list[str]:
-    ids = list(sample_ids)
-    if sample_count >= len(ids):
-        return ids
-    indices = rng.choice(len(ids), size=sample_count, replace=False)
-    return [ids[index] for index in indices]
-
-
-def _sample_records(records: Sequence[Dict[str, Any]], sample_count: int, rng: np.random.Generator) -> list[Dict[str, Any]]:
-    entries = list(records)
-    if sample_count >= len(entries):
-        return entries
-    indices = rng.choice(len(entries), size=sample_count, replace=False)
-    return [entries[index] for index in indices]
 
 
 def _summary_stats(values: Sequence[float]) -> Dict[str, Any]:
@@ -242,16 +227,15 @@ def compute_anatomy_over_modality_margin(
     max_samples_per_pool: int | None = None,
     bootstrap_resamples: int = 1000,
     seed: int = 42,
+    evaluation_plan: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    supported_organ_set = set(supported_organs or [])
-    eligible_samples = [
-        sample
-        for sample in samples
-        if sample.get("sample_id") in features_by_id
-        and sample.get("primary_organ")
-        and (not supported_organ_set or sample.get("primary_organ") in supported_organ_set)
-    ]
-    if not eligible_samples:
+    if evaluation_plan is not None:
+        validate_evaluation_plan(evaluation_plan, samples, seed=seed, supported_organs=supported_organs,
+                                 max_samples_per_pool=max_samples_per_pool, bootstrap_resamples=bootstrap_resamples)
+        supported_organs = evaluation_plan["supported_organs"]
+    records = eligible_samples(samples, supported_organs)
+    require_features(features_by_id, records)
+    if not records:
         return {
             "status": "skipped",
             "reason": "no_samples_with_primary_organs_and_features",
@@ -262,45 +246,19 @@ def compute_anatomy_over_modality_margin(
         for sample_id, feature in features_by_id.items()
     }
 
-    by_organ_and_modality: Dict[str, Dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
-    for sample in eligible_samples:
-        by_organ_and_modality[sample["primary_organ"]][sample["modality"]].append(sample["sample_id"])
-
-    rng = np.random.default_rng(seed)
+    selection = (evaluation_plan["margin"] if evaluation_plan is not None
+                 else margin_selection(records, max_samples_per_pool, seed))
+    by_id = {record["sample_id"]: record for record in records}
     query_results: list[Dict[str, Any]] = []
     per_organ_margins: Dict[str, list[float]] = defaultdict(list)
-    skipped_queries = 0
-    for sample in tqdm(eligible_samples, desc="Cross-Modal anatomy-margin queries", unit="query", dynamic_ncols=True, leave=False):
-        sample_id = sample["sample_id"]
-        organ = sample["primary_organ"]
-        modality = sample["modality"]
-
-        positive_pool = [
-            candidate_id
-            for other_modality, candidate_ids in by_organ_and_modality[organ].items()
-            if other_modality != modality
-            for candidate_id in candidate_ids
-        ]
-        negative_pool = [
-            candidate_id
-            for other_organ, modality_map in by_organ_and_modality.items()
-            if other_organ != organ
-            for candidate_id in modality_map.get(modality, [])
-        ]
-
-        if not positive_pool or not negative_pool:
-            skipped_queries += 1
-            continue
-
-        sample_count = min(len(positive_pool), len(negative_pool))
-        if max_samples_per_pool is not None:
-            sample_count = min(sample_count, max_samples_per_pool)
-        if sample_count <= 0:
-            skipped_queries += 1
-            continue
-
-        selected_positive_ids = _sample_ids(positive_pool, sample_count, rng)
-        selected_negative_ids = _sample_ids(negative_pool, sample_count, rng)
+    skipped_queries = selection["n_skipped_queries"]
+    for query in tqdm(selection["queries"], desc="Cross-Modal anatomy-margin queries", unit="query", dynamic_ncols=True, leave=False):
+        sample_id = query["sample_id"]
+        sample = by_id[sample_id]
+        organ, modality = sample["primary_organ"], sample["modality"]
+        selected_positive_ids = query["positive_ids"]
+        selected_negative_ids = query["negative_ids"]
+        sample_count = len(selected_positive_ids)
 
         query_feature = normalized_features[sample_id]
         positive_features = np.stack([normalized_features[candidate_id] for candidate_id in selected_positive_ids], axis=0)
@@ -334,7 +292,8 @@ def compute_anatomy_over_modality_margin(
     margins = np.asarray([result["margin"] for result in query_results], dtype=np.float64)
     bootstrap_ci = None
     if bootstrap_resamples > 0 and len(margins) > 1:
-        bootstrap_rng = np.random.default_rng(seed + 1)
+        bootstrap_seed = evaluation_plan["bootstrap"]["margin_seed"] if evaluation_plan is not None else seed + 1
+        bootstrap_rng = np.random.Generator(np.random.PCG64(bootstrap_seed))
         bootstrap_means = np.empty(bootstrap_resamples, dtype=np.float64)
         for index in tqdm(range(bootstrap_resamples), desc="Cross-Modal margin bootstrap", unit="resample", dynamic_ncols=True, leave=False):
             sample_indices = bootstrap_rng.integers(0, len(margins), size=len(margins))
@@ -378,65 +337,27 @@ def compute_balanced_lisi(
     perplexity: float = 30.0,
     k_neighbors: int | None = None,
     seed: int = 42,
+    evaluation_plan: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    if NearestNeighbors is None:
-        return {
-            "status": "unavailable",
-            "reason": "scikit-learn not installed",
-        }
-
-    supported_organ_set = set(supported_organs or [])
-    required_modalities = tuple(required_modalities)
-    eligible_samples = [
-        sample
-        for sample in samples
-        if sample.get("sample_id") in features_by_id
-        and sample.get("primary_organ")
-        and sample.get("modality") in required_modalities
-        and (not supported_organ_set or sample.get("primary_organ") in supported_organ_set)
-    ]
-    if not eligible_samples:
-        return {
-            "status": "skipped",
-            "reason": "no_samples_with_primary_organs_features_and_required_modalities",
-        }
-
-    by_organ_and_modality: Dict[str, Dict[str, list[Dict[str, Any]]]] = defaultdict(lambda: defaultdict(list))
-    for sample in eligible_samples:
-        by_organ_and_modality[sample["primary_organ"]][sample["modality"]].append(sample)
-
-    common_organs = sorted(
-        organ
-        for organ, modality_map in by_organ_and_modality.items()
-        if all(modality_map.get(modality) for modality in required_modalities)
-    )
+    if evaluation_plan is not None:
+        validate_evaluation_plan(evaluation_plan, samples, seed=seed, supported_organs=supported_organs,
+                                 required_modalities=required_modalities,
+                                 max_lisi_samples_per_group=max_samples_per_group,
+                                 lisi_perplexity=perplexity, lisi_k_neighbors=k_neighbors)
+        supported_organs = evaluation_plan["supported_organs"]
+    required_modalities = tuple(sorted(set(required_modalities)))
+    records = [row for row in eligible_samples(samples, supported_organs)
+               if row["modality"] in required_modalities]
+    require_features(features_by_id, records)
+    selection = (evaluation_plan["lisi"] if evaluation_plan is not None
+                 else lisi_selection(records, required_modalities, max_samples_per_group, seed))
+    common_organs = selection["organs"]
+    samples_per_group = selection["samples_per_group"]
     if len(common_organs) < 2:
-        return {
-            "status": "skipped",
-            "reason": "need_at_least_two_organs_with_full_modality_support_for_lisi",
-            "n_organs": len(common_organs),
-        }
-
-    samples_per_group = min(
-        len(by_organ_and_modality[organ][modality])
-        for organ in common_organs
-        for modality in required_modalities
-    )
-    if max_samples_per_group is not None:
-        samples_per_group = min(samples_per_group, max_samples_per_group)
-    if samples_per_group <= 0:
-        return {
-            "status": "skipped",
-            "reason": "balanced_lisi_candidate_pool_could_not_be_formed",
-        }
-
-    rng = np.random.default_rng(seed)
-    balanced_records = [
-        record
-        for organ in common_organs
-        for modality in required_modalities
-        for record in _sample_records(by_organ_and_modality[organ][modality], samples_per_group, rng)
-    ]
+        return {"status": "skipped", "reason": "need_at_least_two_organs_with_full_modality_support_for_lisi",
+                "n_organs": len(common_organs)}
+    by_id = {record["sample_id"]: record for record in records}
+    balanced_records = [by_id[sample_id] for sample_id in selection["sample_ids"]]
     if len(balanced_records) < 3:
         return {
             "status": "skipped",
@@ -458,11 +379,7 @@ def compute_balanced_lisi(
     effective_neighbors = min(max(1, requested_neighbors), n_samples - 1)
     effective_perplexity = float(min(effective_perplexity, max(1, effective_neighbors)))
 
-    neighbor_model = NearestNeighbors(n_neighbors=effective_neighbors + 1, metric="euclidean")
-    neighbor_model.fit(feature_matrix)
-    distances, indices = neighbor_model.kneighbors(feature_matrix)
-    squared_neighbor_distances = np.square(distances[:, 1:])
-    neighbor_indices = indices[:, 1:]
+    sample_ids = np.asarray([row["sample_id"] for row in balanced_records])
 
     modality_ilisi_values: list[float] = []
     organ_clisi_values: list[float] = []
@@ -471,12 +388,16 @@ def compute_balanced_lisi(
 
     lisi_iterator = tqdm(balanced_records, desc="Cross-Modal balanced LISI", unit="sample", dynamic_ncols=True, leave=False)
     for sample_index, record in enumerate(lisi_iterator):
+        # Exclude this sample explicitly: duplicate vectors need not rank self first.
+        squared_distances = np.sum((feature_matrix - feature_matrix[sample_index]) ** 2, axis=1)
+        candidate_indices = np.flatnonzero(np.arange(n_samples) != sample_index)
+        order = np.lexsort((sample_ids[candidate_indices], squared_distances[candidate_indices]))
+        neighbors = candidate_indices[order[:effective_neighbors]]
         probabilities = _probabilities_with_perplexity(
-            squared_neighbor_distances[sample_index],
-            perplexity=effective_perplexity,
+            squared_distances[neighbors], perplexity=effective_perplexity,
         )
-        neighbor_organs = organ_labels[neighbor_indices[sample_index]]
-        neighbor_modalities = modality_labels[neighbor_indices[sample_index]]
+        neighbor_organs = organ_labels[neighbors]
+        neighbor_modalities = modality_labels[neighbors]
 
         modality_ilisi = _inverse_simpson(neighbor_modalities, probabilities)
         organ_clisi = _inverse_simpson(neighbor_organs, probabilities)

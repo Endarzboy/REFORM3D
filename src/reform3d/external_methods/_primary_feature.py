@@ -9,6 +9,17 @@ from typing import Any, Callable
 import torch
 
 
+def reference_checkpoint_sha256(
+    checkpoint_path: Path,
+    reference_path: Path,
+    reference_sha256: str,
+) -> str | None:
+    """Return the recorded reference hash only for its configured path."""
+    if checkpoint_path.expanduser().resolve() == reference_path.expanduser().resolve():
+        return reference_sha256
+    return None
+
+
 @dataclass(frozen=True)
 class PrimaryFeatureMethod:
     display_name: str

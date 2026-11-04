@@ -15,6 +15,8 @@ Counts describe the implemented inference backbone, including learned positions 
 
 Published Med3DINO checkpoint destinations will be linked here when available. Weight access and redistribution terms remain separate from source-code licensing; see [source notices](LICENSES/README.md).
 
+[Checkpoint metadata](checkpoints.json) records reference filenames, file sizes, SHA-256 hashes, geometry policies, and weight-license information. These hashes identify the recorded files; download URLs remain unset until confirmed.
+
 Expected filenames when using `checkpoint_root`:
 
 ```text
@@ -72,6 +74,6 @@ For bundled SAM-Med3D, MiM, and GL-MAE dependencies, install:
 python -m pip install -c requirements.txt '.[external]'
 ```
 
-Other adapters may need upstream code or a separate environment. OpenMind requires its compatible upstream source and environment. Missing backends must be configured explicitly; no adapter searches the old research checkout.
+Other adapters may need upstream code or a separate environment. OpenMind requires its compatible upstream source and environment. Configure these dependencies explicitly before selecting the adapter.
 
-YAML runs record checkpoint hashes in `run.json`. For external encoders, use the dedicated adapter's `--help` for its required inputs and options. Source attribution and license records are in [Source notices](LICENSES/README.md).
+YAML runs record checkpoint hashes in `run.json`. For external encoders, use the dedicated adapter's `--help` for its required inputs and options. [External encoder metadata](external_encoders.json) records reference weight hashes, feature interfaces, and available upstream source commits. MiM records separate hashes for its ZIP archive and extracted weight file. Source attribution and license records are in [Source notices](LICENSES/README.md).

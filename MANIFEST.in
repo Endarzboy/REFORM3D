@@ -1,0 +1,20 @@
+include .gitignore README.md LICENSE requirements.txt
+include configs/kits23-demo.yaml configs/mmwhs-demo.yaml configs/custom-organs.yaml
+include docs/data.md docs/encoders.md docs/usage.md docs/reproduction.md docs/visualization.md
+include docs/checkpoints.json docs/external_encoders.json
+include docs/assets/reform3d_arch.jpg
+recursive-include docs/LICENSES *.txt *.md *.json
+include notebooks/.gitignore notebooks/visualize_PCA.ipynb
+
+prune tests
+prune reproduction
+prune validation
+prune workspace
+prune docs/reference_results
+prune docs/reform3d-website
+prune notebooks/example_cases
+prune build
+prune dist
+prune .venv
+exclude AGENTS.md docs/audit.md configs/kits23.yaml configs/mmwhs.yaml
+global-exclude __pycache__ *.py[cod]

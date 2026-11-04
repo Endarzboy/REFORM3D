@@ -4,7 +4,8 @@ import csv
 import json
 from dataclasses import asdict, replace
 from pathlib import Path
-from .settings import digest, write_json
+from .settings import digest, file_hash, write_json
+from .core.reproducibility import canonical_records
 from .workspace import manifest_directory
 
 PATH_FIELDS = ('file_path', 'mask_path', 'label_path')
@@ -62,6 +63,9 @@ def prepare_manifest(cfg):
         raise ValueError('Manifest contains no samples or volumes')
     if ('acquisition' in cfg['modules']) != ('volumes' in payload):
         raise ValueError('Acquisition needs volumes; cross-modal/anatomical need organ samples')
+    kind = 'samples' if 'samples' in payload else 'volumes'
+    records = canonical_records(records, kind)
+    payload[kind] = records
     if 'volumes' in payload:
         from .modules.acquisition_robustness.config import RAW_DATASETS, compute_anisotropy_ratio, get_anisotropy_bin
         modalities = [cfg.get('modality'), payload.get('modality')]
@@ -148,10 +152,11 @@ def prepare_manifest(cfg):
                 children = sorted(p for p in path.rglob('*') if p.is_file())
                 if not children:
                     raise ValueError(f'Empty image/mask directory: {path}')
-                fingerprints[str(path)] = [[str(p.relative_to(path)), p.stat().st_size, p.stat().st_mtime_ns] for p in children]
+                if str(path) not in fingerprints:
+                    fingerprints[str(path)] = {str(p.relative_to(path)): file_hash(p) for p in children}
             else:
-                st = path.stat()
-                fingerprints[str(path)] = [st.st_size, st.st_mtime_ns]
+                if str(path) not in fingerprints:
+                    fingerprints[str(path)] = file_hash(path)
                 if str(path).endswith(('.nii', '.nii.gz')) and str(path) not in headers:
                     img = nib.load(path)
                     spacing = np.asarray(img.header.get_zooms()[:3], dtype=float)
@@ -186,8 +191,14 @@ def prepare_manifest(cfg):
             raise ValueError('Controlled source cohort needs at least two distinct eligible volumes')
     payload['dataset'] = cfg['dataset']
     payload['manifest_variant'] = payload.get('manifest_variant', 'core' if 'samples' in payload else 'original_bins')
+    content_records = [
+        {**{key: value for key, value in row.items() if key not in PATH_FIELDS},
+         'inputs': {key: fingerprints[row[key]] for key in PATH_FIELDS if row.get(key)}}
+        for row in records
+    ]
+    payload['content_hash'] = digest({'dataset': cfg['dataset'], 'modality': payload.get('modality'), 'records': content_records})
     identity = digest({'payload': payload, 'files': fingerprints})
     path = manifest_directory(cfg) / f"{cfg['dataset']}-{identity[:16]}.json"
     write_json(path, payload)
-    write_json(path.with_suffix('.provenance.json'), {'manifest_hash': identity, 'fingerprint_policy': 'resolved paths, file sizes and nanosecond modification times; headers validated', 'files': fingerprints, 'records': len(records)})
+    write_json(path.with_suffix('.provenance.json'), {'manifest_hash': identity, 'content_hash': payload['content_hash'], 'fingerprint_policy': 'SHA-256 of image and annotation bytes; headers validated', 'files': fingerprints, 'records': len(records)})
     return path, payload, identity

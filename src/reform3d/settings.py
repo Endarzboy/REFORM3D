@@ -57,8 +57,8 @@ def load_settings(path):
     for field in ['seeds', 'feature_types']:
         if not isinstance(cfg[field], list) or not cfg[field] or len(set(cfg[field])) != len(cfg[field]):
             raise ValueError(f'{field} must be a nonempty list without duplicates')
-    if not all(isinstance(s, int) and not isinstance(s, bool) and s >= 0 for s in cfg['seeds']):
-        raise ValueError('seeds must be nonnegative integers')
+    if not all(isinstance(s, int) and not isinstance(s, bool) and 0 <= s < 2**32 for s in cfg['seeds']):
+        raise ValueError('seeds must be integers between 0 and 4294967295')
     if not set(cfg['feature_types']) <= {'cls', 'avg_pool', 'multilayer'}:
         raise ValueError('Supported feature_types: cls, avg_pool, multilayer')
     if len(set(cfg['checkpoints'])) != len(cfg['checkpoints']):

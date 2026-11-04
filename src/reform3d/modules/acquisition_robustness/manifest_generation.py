@@ -40,7 +40,6 @@ try:
         get_acquisition_manifest_dir,
         normalize_manifest_variant,
         compute_anisotropy_ratio,
-        ensure_directories,
         RawDatasetConfig,
     )
 except ImportError:  # pragma: no cover - direct script execution fallback
@@ -62,7 +61,6 @@ except ImportError:  # pragma: no cover - direct script execution fallback
         get_acquisition_manifest_dir,
         normalize_manifest_variant,
         compute_anisotropy_ratio,
-        ensure_directories,
         RawDatasetConfig,
     )
 
@@ -564,8 +562,6 @@ def build_full_manifest(
     Returns:
         List of all VolumeMetadata objects
     """
-    ensure_directories()
-
     # Select datasets (filter by is_enabled unless explicitly specified)
     if datasets is None:
         # Default: only include enabled datasets
@@ -700,7 +696,6 @@ def build_single_dataset_manifest(
     the `manifest_full.json`, `manifest_sampled.json`, and
     `manifest_meta.json` files to the acquisition manifest directory.
     """
-    ensure_directories()
     np.random.seed(seed)
 
     manifest_variant = normalize_manifest_variant(binning_scheme)

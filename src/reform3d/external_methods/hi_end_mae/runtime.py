@@ -12,15 +12,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from reform3d.core.paths import resolve_external_method_checkpoint_path
-from reform3d.external_methods._primary_feature import PrimaryFeatureMethod
+from reform3d.external_methods._primary_feature import PrimaryFeatureMethod, reference_checkpoint_sha256
 
 
-HI_END_MAE_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "Hi-End-MAE"
 REGISTERED_CHECKPOINT_PATH = resolve_external_method_checkpoint_path(
     "hi_end_mae",
     "hi_end_mae_10k.pth",
 )
-LOCAL_CHECKPOINT_PATH = HI_END_MAE_SOURCE_ROOT / "checkpoint" / "hi_end_mae_10k.pth"
 DEFAULT_CHECKPOINT_PATH = REGISTERED_CHECKPOINT_PATH
 DEFAULT_CHECKPOINT_NAME = "hi_end_mae_vit_p12_1536"
 DEFAULT_MODEL_NAME = "Hi-End-MAE ViT-p12/1536"
@@ -301,7 +299,9 @@ class HiEndMAEFeatureExtractor:
             input_size=DEFAULT_CROP_SIZE,
             checkpoint_path=str(checkpoint_path),
             source_commit=SOURCE_COMMIT,
-            checkpoint_sha256=CHECKPOINT_SHA256,
+            checkpoint_sha256=reference_checkpoint_sha256(
+                checkpoint_path, DEFAULT_CHECKPOINT_PATH, CHECKPOINT_SHA256,
+            ),
         )
 
     @torch.inference_mode()

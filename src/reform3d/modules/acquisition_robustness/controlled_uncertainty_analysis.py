@@ -21,6 +21,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import csv
 import json
@@ -558,6 +559,14 @@ def _load_bundle(bundle_path: Path) -> tuple[Dict[str, np.ndarray], list[str], s
             variant_kinds = dict(zip(variant_order, kind_values))
         else:
             variant_kinds = {variant: "spacing" for variant in variant_order}
+    if case_ids:
+        if len(set(case_ids)) != len(case_ids):
+            raise ValueError("Controlled bundle has duplicate case IDs")
+        if any(len(features) != len(case_ids) for features in features_by_variant.values()):
+            raise ValueError("Controlled bundle has incomplete case features")
+        order = np.argsort(np.asarray(case_ids, dtype=str), kind="stable")
+        case_ids = [case_ids[index] for index in order]
+        features_by_variant = {name: features[order] for name, features in features_by_variant.items()}
     return features_by_variant, variant_order, reference_variant, case_ids, variant_kinds
 
 
@@ -788,7 +797,7 @@ def _analyze_metric_paths(
         (path, int(bootstrap_resamples), int(seed), cka_method, int(semantic_cv_splits))
         for path in metric_paths
     ]
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn")) as executor:
         futures = {
             executor.submit(_analyze_metric_path_task, task): index
             for index, task in enumerate(tasks)

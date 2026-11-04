@@ -44,6 +44,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 from tqdm import tqdm
 
+from reform3d.core.reproducibility import canonical_records, load_plan, plan_hash
+
 from .config import (
     DEFAULT_CHECKPOINTS,
     DEFAULT_CHECKPOINT_POLICY,
@@ -72,6 +74,8 @@ from .config import (
     normalize_manifest_variant,
 )
 from .few_shot_transfer_analysis import (
+    build_evaluation_plan,
+    _consume_evaluation_plan,
     evaluate_low_shot_target_transfer,
     evaluate_support_size_sweep,
     support_size_sweep_csv_rows,
@@ -278,6 +282,9 @@ def _write_batch_summary(
 
 def _load_embedding_bundle(npz_path: Path, manifest_samples: List[Dict[str, Any]]) -> Dict[str, np.ndarray]:
     from reform3d.core.features import load_organ_feature_bundle
+    with np.load(npz_path, allow_pickle=True) as payload:
+        if "sample_ids" not in payload:
+            raise ValueError("Anatomical feature bundles require explicit sample_ids")
     return load_organ_feature_bundle(npz_path, [sample["sample_id"] for sample in manifest_samples], dtype=np.float32)
 
 def _feature_adapter_output_path(
@@ -477,6 +484,7 @@ def _evaluate_single_bundle(
     projection_spacing_target_variants: Sequence[str] | None = None,
     projection_components: int = 4,
     projection_strength: float = 1.0,
+    evaluation_plan: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Evaluate one checkpoint/feature bundle against one Anatomical manifest.
 
@@ -494,7 +502,8 @@ def _evaluate_single_bundle(
     progress.set_postfix_str("resolved paths")
     progress.update(1)
 
-    samples = load_anatomical_manifest(manifest_path)
+    samples = canonical_records(load_anatomical_manifest(manifest_path), kind="samples")
+    required_modalities = sorted(set(required_modalities))
     progress.set_postfix_str("loaded manifest")
     progress.update(1)
     validation = validate_anatomical_manifest(
@@ -510,6 +519,18 @@ def _evaluate_single_bundle(
         required_modalities=required_modalities,
         min_samples_per_modality=min_samples_per_modality,
     )
+    if evaluation_plan is not None and list(few_shot_seeds) != [seed]:
+        raise ValueError("An anatomical evaluation plan requires --seed and --few-shot-seeds to agree")
+    plan_options = dict(
+        required_modalities=required_modalities, supported_organs=supported_organs,
+        min_samples_per_modality=min_samples_per_modality,
+        support_per_modality=few_shot_support_per_modality,
+        query_per_modality=few_shot_query_per_modality,
+    )
+    if evaluation_plan is None and len(few_shot_seeds) == 1:
+        evaluation_plan = build_evaluation_plan(samples, seed=few_shot_seeds[0], **plan_options)
+    if evaluation_plan is not None:
+        _consume_evaluation_plan(evaluation_plan, samples, seed=few_shot_seeds[0], **plan_options)
     progress.set_postfix_str("validated manifest")
     progress.update(1)
     features_by_id = _load_embedding_bundle(embeddings_npz, samples)
@@ -541,8 +562,10 @@ def _evaluate_single_bundle(
         query_per_modality=few_shot_query_per_modality,
         seeds=few_shot_seeds,
         feature_projection=feature_projection,
+        evaluation_plan=evaluation_plan,
+        min_samples_per_modality=min_samples_per_modality,
     )
-    progress.set_postfix_str("surface B")
+    progress.set_postfix_str("low-shot transfer")
     progress.update(1)
     baseline_output_path = output_path or get_checkpoint_metrics_path(output_paths["results"], checkpoint_name, feature_type)
     resolved_output_path = (
@@ -583,6 +606,8 @@ def _evaluate_single_bundle(
         "feature_type": feature_type,
         "manifest_path": str(manifest_path),
         "embeddings_npz": str(embeddings_npz),
+        "evaluation_plan_hash": plan_hash(evaluation_plan) if evaluation_plan is not None else None,
+        "evaluation_plan_hashes": few_shot_analysis["evaluation_plan_hashes"],
         "required_modalities": list(required_modalities),
         "feature_adapter": feature_projection.to_payload()
         if feature_projection is not None and feature_projection.enabled
@@ -752,20 +777,20 @@ def main() -> None:
         "--few-shot-support-per-modality",
         type=int,
         default=DEFAULT_FEW_SHOT_SUPPORT_PER_MODALITY,
-        help="Balanced Surface B support budget per organ and modality",
+        help="Balanced support budget per organ and modality",
     )
     parser.add_argument(
         "--few-shot-query-per-modality",
         type=int,
         default=DEFAULT_FEW_SHOT_QUERY_PER_MODALITY,
-        help="Optional cap for the balanced Surface B query budget per organ and modality",
+        help="Optional cap for the balanced query budget per organ and modality",
     )
     parser.add_argument(
         "--few-shot-seeds",
         nargs="+",
         type=int,
         default=list(DEFAULT_FEW_SHOT_SEEDS),
-        help="Random seeds used for Surface B balanced support/query sampling",
+        help="Random seeds used for balanced support/query sampling",
     )
     parser.add_argument(
         "--support-size-sweep",
@@ -775,6 +800,7 @@ def main() -> None:
         help="Optional support-per-modality sweep. Use without values for 1 2 4 8.",
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--evaluation-plan", help="Saved anatomical support/query selection plan")
     parser.add_argument("--output-path", default=None, help="Explicit output path for single-bundle mode")
     parser.add_argument("--manifest-summary-output-dir", default=None, help="Optional manifest summary directory")
     parser.add_argument("--summary-output", default=None, help=f"Optional batch summary JSON path ({SUMMARY_JSON_NAME})")
@@ -802,6 +828,7 @@ def main() -> None:
     parser.add_argument("--projection-spacing-reference-variant", default=None)
     parser.add_argument("--projection-spacing-target-variants", nargs="+", default=None)
     args = parser.parse_args()
+    evaluation_plan = load_plan(args.evaluation_plan) if args.evaluation_plan else None
     support_size_sweep = (
         [1, 2, 4, 8]
         if args.support_size_sweep == []
@@ -849,6 +876,7 @@ def main() -> None:
             few_shot_query_per_modality=args.few_shot_query_per_modality,
             few_shot_seeds=args.few_shot_seeds,
             seed=args.seed,
+            evaluation_plan=evaluation_plan,
             output_path=Path(args.output_path).resolve() if args.output_path else None,
             manifest_summary_dir=Path(args.manifest_summary_output_dir).resolve() if args.manifest_summary_output_dir else None,
             support_size_sweep=support_size_sweep,
@@ -964,6 +992,7 @@ def main() -> None:
                 few_shot_query_per_modality=args.few_shot_query_per_modality,
                 few_shot_seeds=args.few_shot_seeds,
                 seed=args.seed,
+                evaluation_plan=evaluation_plan,
                 output_path=None,
                 manifest_summary_dir=Path(args.manifest_summary_output_dir).resolve() if args.manifest_summary_output_dir else None,
                 support_size_sweep=support_size_sweep,

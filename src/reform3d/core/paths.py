@@ -1,9 +1,9 @@
 """Path registry for REFORM-3D evaluation.
 
 The registry resolves repository, dataset, checkpoint, manifest, cache, and
-result roots from environment variables with Linux evaluation-machine defaults.
-All modules use these helpers so artifacts land under the same directory
-contract.
+result roots from environment variables. Data, checkpoints and workspace
+directories default to the current working directory; the repository root
+defaults to the package source location.
 
 Common inputs:
     MED3DINO_EXTERNAL_DATA_ROOT, MED3DINO_CHECKPOINT_ROOT,
@@ -122,54 +122,6 @@ def resolve_reform3d_module_manifest_path(
     if relative_path.is_absolute():
         return relative_path
     return get_reform3d_module_manifest_root(module_name) / relative_path
-
-
-def get_reform3d_phase_result_roots(
-    phase_directory_name: str,
-    output_directory_name: str | None = None,
-) -> tuple[Path, ...]:
-    return get_reform3d_module_result_roots(phase_directory_name, output_directory_name)
-
-
-def get_reform3d_phase_result_root(
-    phase_directory_name: str,
-    output_directory_name: str | None = None,
-) -> Path:
-    return get_reform3d_module_result_root(phase_directory_name, output_directory_name)
-
-
-def get_reform3d_phase_results_root(
-    phase_directory_name: str,
-    output_directory_name: str | None = None,
-) -> Path:
-    return get_reform3d_module_results_root(phase_directory_name, output_directory_name)
-
-
-def resolve_reform3d_phase_result_path(
-    phase_directory_name: str,
-    output_directory_name: str | None,
-    relative_path: Path | str,
-) -> Path:
-    return resolve_reform3d_module_result_path(
-        phase_directory_name,
-        output_directory_name,
-        relative_path,
-    )
-
-
-def get_reform3d_phase_manifest_roots(phase_directory_name: str) -> tuple[Path, ...]:
-    return get_reform3d_module_manifest_roots(phase_directory_name)
-
-
-def get_reform3d_phase_manifest_root(phase_directory_name: str) -> Path:
-    return get_reform3d_module_manifest_root(phase_directory_name)
-
-
-def resolve_reform3d_phase_manifest_path(
-    phase_directory_name: str,
-    relative_path: Path | str,
-) -> Path:
-    return resolve_reform3d_module_manifest_path(phase_directory_name, relative_path)
 
 
 def get_reform3d_cache_roots() -> tuple[Path, ...]:

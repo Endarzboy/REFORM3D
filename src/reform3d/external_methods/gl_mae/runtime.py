@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 
 from reform3d.core.paths import resolve_external_method_checkpoint_path
-from reform3d.external_methods._primary_feature import PrimaryFeatureMethod
-from reform3d.external_methods._sources import source_root, add_source_path
+from reform3d.external_methods._primary_feature import PrimaryFeatureMethod, reference_checkpoint_sha256
+from reform3d.external_methods._sources import source_root
 
 
 GL_MAE_SOURCE_ROOT = source_root("gl_mae", Path(__file__).resolve().parents[1] / "GL-MAE")
@@ -21,7 +21,6 @@ REGISTERED_CHECKPOINT_PATH = resolve_external_method_checkpoint_path(
     "gl_mae",
     "checkpoint-1599.pth",
 )
-LOCAL_CHECKPOINT_PATH = GL_MAE_SOURCE_ROOT / "checkpoint" / "checkpoint-1599.pth"
 DEFAULT_CHECKPOINT_PATH = REGISTERED_CHECKPOINT_PATH
 DEFAULT_CHECKPOINT_NAME = "gl_mae_vit_base_patch16"
 DEFAULT_MODEL_NAME = "GL-MAE ViT-B/16"
@@ -196,7 +195,9 @@ class GLMAEFeatureExtractor:
             input_size=DEFAULT_CROP_SIZE,
             checkpoint_path=str(checkpoint_path),
             source_commit=SOURCE_COMMIT,
-            checkpoint_sha256=CHECKPOINT_SHA256,
+            checkpoint_sha256=reference_checkpoint_sha256(
+                checkpoint_path, DEFAULT_CHECKPOINT_PATH, CHECKPOINT_SHA256,
+            ),
         )
 
     @torch.inference_mode()

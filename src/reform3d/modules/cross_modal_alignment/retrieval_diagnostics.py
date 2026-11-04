@@ -161,7 +161,7 @@ def build_ct_pet_corpus_constraint(
         "required_to_enable": [
             "paired or cohort-level CT and PET image records",
             "organ-level masks or labels shared across modalities",
-            "case-disjoint IDs for leakage audit",
+            "case-disjoint IDs for evaluation",
         ],
     }
 

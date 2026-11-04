@@ -38,7 +38,6 @@ from reform3d.modules.acquisition_robustness.config import (
 )
 
 from .config import get_cross_modal_manifest_dir, normalize_cross_modal_dataset_name
-from .path_resolution import normalize_totalsegmenter_ct_record
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -267,7 +266,7 @@ def _load_acquisition_source_volumes(dataset_name: str) -> List[Dict[str, Any]]:
     else:
         volumes = list(manifest)
     if dataset_name == "totalsegmenter_ct":
-        return [normalize_totalsegmenter_ct_record(volume) for volume in volumes if isinstance(volume, dict)]
+        return [dict(volume) for volume in volumes if isinstance(volume, dict)]
     return volumes
 
 
@@ -411,9 +410,21 @@ def _build_mmwhs_case_records(dataset_root: Path, modality: str, min_voxels: int
     subset_dir = dataset_root / f"{modality}_train"
     support_counts = {organ: 0 for organ in MMWHS_LABELS.values()}
     case_records: List[Dict[str, Any]] = []
-    for label_path in tqdm(sorted(subset_dir.glob(f"{modality}_train_*_label.nii")), desc=f"Scanning MMWHS {modality}", unit="case"):
-        case_id = label_path.stem.replace("_label", "")
-        image_path = _resolve_mmwhs_image_path(subset_dir / f"{case_id}_image.nii")
+    labels = {}
+    for suffix in (".nii", ".nii.gz"):
+        for label_path in sorted(subset_dir.glob(f"{modality}_train_*_label{suffix}")):
+            case_id = label_path.name.removesuffix(suffix).removesuffix("_label")
+            if case_id in labels:
+                raise ValueError(f"Ambiguous MMWHS labels for {case_id}: {labels[case_id]}, {label_path}")
+            labels[case_id] = label_path
+    for case_id, label_path in tqdm(sorted(labels.items()), desc=f"Scanning MMWHS {modality}", unit="case"):
+        images = [subset_dir / f"{case_id}_image{suffix}" for suffix in (".nii", ".nii.gz")]
+        images = [path for path in images if path.exists()]
+        if not images:
+            raise FileNotFoundError(f"Missing MMWHS image for {case_id} under {subset_dir}")
+        if len(images) != 1:
+            raise ValueError(f"Ambiguous MMWHS images for {case_id}: {images}")
+        image_path = _resolve_mmwhs_image_path(images[0])
         shape, spacing = _sitk_shape_spacing(image_path)
         organ_counts = _sitk_label_counts(label_path, MMWHS_LABELS, min_voxels)
         present_organs = [organ for organ, count in organ_counts.items() if count > 0]

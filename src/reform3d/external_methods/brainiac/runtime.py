@@ -18,7 +18,6 @@ from monai.networks.nets import ViT
 from reform3d.core.paths import resolve_external_method_checkpoint_path
 
 
-BRAINIAC_ROOT = Path(__file__).resolve().parent
 DEFAULT_CHECKPOINT_PATH = resolve_external_method_checkpoint_path("brainiac", "BrainIAC.ckpt")
 DEFAULT_CHECKPOINT_NAME = "brainiac"
 DEFAULT_MODEL_NAME = "BrainIAC"

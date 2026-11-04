@@ -94,4 +94,6 @@ Existing JSON manifests are also accepted through `manifest`. Controlled evaluat
 
 Dataset names and paths do not determine pretraining exposure. Optional exposure annotations supplied in a JSON manifest are retained as user metadata; they do not affect cohort selection or scores.
 
-Input fingerprints use resolved paths, file sizes, and modification times; weights use SHA-256. Do not modify data or generated caches in place. Dataset and weight access terms remain those of their providers.
+Image, annotation, and weight identities use SHA-256 content checksums. Checking a dataset reads each unique input file, so preparation time includes this I/O. Headers are also checked for matching geometry. Do not modify inputs or generated caches during evaluation. Dataset and weight access terms remain those of their providers.
+
+Organ manifests require explicit, unique sample IDs and stable case identities. Acquisition records use `case_id` (or `source_case_id`); if absent, the image filename without `.nii`/`.gz` supplies the ID. Ambiguous filenames require explicit IDs. Acquisition currently requires one source scan per patient for its case-disjoint semantic folds; repeated patient identities fail explicitly.

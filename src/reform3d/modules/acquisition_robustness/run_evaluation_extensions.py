@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Iterable
 
 from reform3d.core.checkpoints import CHECKPOINTS, CHECKPOINT_ORDER, resolve_checkpoint_config
-from reform3d.core.evaluation_summary import write_evaluation_summary
-from reform3d.core.leakage_audit import write_leakage_audit
 from reform3d.core.repeated_seed_runner import repeated_seed_base_argv, run_seeded_module
 from reform3d.core.repeated_seed_summary import write_extension_seed_summary
 from reform3d.core.seed_context import DEFAULT_REPEATED_SEEDS, get_active_seed
@@ -173,8 +171,6 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--run-metrics", action="store_true", help="Run controlled perturbation metrics for selected extension surfaces.")
     parser.add_argument("--fast-seeded-evaluation", action="store_true", help="Skip expensive figures and matched semantic metrics.")
-    parser.add_argument("--leakage-audit", action="store_true", help="Write a manifest-level leakage audit under the extension folder.")
-    parser.add_argument("--write-evaluation-summary", action="store_true", help="Write neutral evaluation summary artifacts under the extension folder.")
     parser.add_argument("--dry-run", action="store_true", help="Print the extension plan without writing or running metrics.")
     args = parser.parse_args(argv)
 
@@ -250,18 +246,6 @@ def main(argv: list[str] | None = None) -> None:
         include_sensitivity=args.sensitivity_sweep,
         include_extra_perturbations=args.extra_perturbations,
     )
-
-    if args.leakage_audit:
-        write_leakage_audit([manifest_path], extension_root / "leakage_audit.json")
-    if args.write_evaluation_summary:
-        artifacts.update(
-            write_evaluation_summary(
-                extension_root,
-                module_name="acquisition_robustness",
-                dataset=args.dataset,
-                manifest_variant=manifest_variant,
-            )
-        )
 
     metric_records: list[dict[str, str]] = []
     if args.run_metrics:

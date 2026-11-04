@@ -26,6 +26,8 @@ import numpy as np
 from tqdm import tqdm
 
 from reform3d.core.paths import PROJECT_ROOT, get_reform3d_module_result_roots
+from reform3d.core.reproducibility import load_plan, plan_hash
+from .sampling import build_evaluation_plan, validate_evaluation_plan, canonical_samples
 from .config import (
     CROSS_MODAL_MODULE_NAME,
     DEFAULT_MANIFEST_VARIANT,
@@ -227,6 +229,7 @@ def main() -> None:
         default="cls",
         help="Feature family label for per-checkpoint metrics output",
     )
+    parser.add_argument("--evaluation-plan", default=None, help="Saved cross-modal sampling plan to enforce")
     parser.add_argument("--metrics-output", default=None, help="Optional explicit primary metrics JSON path")
     parser.add_argument("--summary-output-dir", default=None, help="Optional manifest/cohort summary directory")
     parser.add_argument("--retrieval-diagnostics-output", default=None, help="Optional retrieval-pool diagnostics JSON path")
@@ -310,7 +313,7 @@ def main() -> None:
     progress.set_postfix_str("resolved paths")
     progress.update(1)
 
-    samples = load_cross_modal_manifest(manifest_path)
+    samples = canonical_samples(load_cross_modal_manifest(manifest_path))
     progress.set_postfix_str("loaded manifest")
     progress.update(1)
     validation = validate_cross_modal_manifest(samples, args.required_modalities)
@@ -357,6 +360,22 @@ def main() -> None:
         logger.info("No embeddings bundle provided; Cross-Modal run completed after manifest and cohort validation")
         return
 
+    plan_options = dict(
+        seed=args.seed, required_modalities=args.required_modalities,
+        min_samples_per_modality=args.min_samples_per_modality,
+        max_samples_per_pool=args.max_samples_per_pool,
+        max_queries_per_organ=args.max_queries_per_organ,
+        max_targets_per_organ=args.max_targets_per_organ,
+        bootstrap_resamples=args.bootstrap_resamples,
+        max_lisi_samples_per_group=args.max_lisi_samples_per_group,
+        lisi_perplexity=args.lisi_perplexity, lisi_k_neighbors=args.lisi_k_neighbors,
+    )
+    if args.evaluation_plan:
+        evaluation_plan = load_plan(args.evaluation_plan)
+        validate_evaluation_plan(evaluation_plan, samples, **plan_options)
+    else:
+        evaluation_plan = build_evaluation_plan(samples, **plan_options)
+
     embeddings_path = _resolve_embeddings_path(args.embeddings_npz)
     checkpoint_name = args.checkpoint_name
     feature_type = normalize_feature_type(args.feature_type)
@@ -378,6 +397,7 @@ def main() -> None:
         max_samples_per_pool=args.max_samples_per_pool,
         bootstrap_resamples=args.bootstrap_resamples,
         seed=args.seed,
+        evaluation_plan=evaluation_plan,
     )
 
     progress.set_postfix_str("anatomy margin")
@@ -390,6 +410,7 @@ def main() -> None:
         max_queries_per_organ=args.max_queries_per_organ,
         max_targets_per_organ=args.max_targets_per_organ,
         seed=args.seed,
+        evaluation_plan=evaluation_plan,
         bootstrap_resamples=args.bootstrap_resamples,
     )
 
@@ -405,12 +426,14 @@ def main() -> None:
         perplexity=args.lisi_perplexity,
         k_neighbors=args.lisi_k_neighbors,
         seed=args.seed,
+        evaluation_plan=evaluation_plan,
     )
 
     progress.set_postfix_str("balanced LISI")
     progress.update(1)
 
     primary_metrics = {
+        "evaluation_plan_hash": plan_hash(evaluation_plan),
         "analysis_name": analysis_name,
         "checkpoint_name": checkpoint_name,
         "manifest_path": str(manifest_path),

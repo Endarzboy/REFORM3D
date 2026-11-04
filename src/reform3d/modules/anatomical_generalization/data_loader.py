@@ -161,11 +161,13 @@ def load_anatomical_manifest(manifest_path: str | Path) -> List[Dict[str, Any]]:
         raw_samples = payload
 
     normalized_samples: List[Dict[str, Any]] = []
-    for index, sample in enumerate(raw_samples):
+    for sample in raw_samples:
         if not isinstance(sample, dict):
-            continue
+            raise ValueError("Anatomical manifest records must be objects")
 
-        sample_id = sample.get("sample_id") or sample.get("id") or sample.get("file_path") or f"sample_{index:06d}"
+        sample_id = sample.get("sample_id") or sample.get("id") or sample.get("file_path")
+        if not isinstance(sample_id, str) or not sample_id.strip():
+            raise ValueError("Every anatomical manifest record requires a stable sample_id, id, or file_path")
         organs = _extract_organs(sample)
         primary_organ = _extract_primary_organ(sample, organs)
         source_dataset = _normalize_dataset_name(sample.get("source_dataset") or sample.get("dataset"))

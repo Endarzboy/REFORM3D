@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import importlib.util
-import sys
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,8 +13,8 @@ import torch
 import torch.nn as nn
 
 from reform3d.core.paths import resolve_external_method_checkpoint_path
-from reform3d.external_methods._primary_feature import PrimaryFeatureMethod
-from reform3d.external_methods._sources import source_root, add_source_path
+from reform3d.external_methods._primary_feature import PrimaryFeatureMethod, reference_checkpoint_sha256
+from reform3d.external_methods._sources import source_root
 
 
 MIM_SOURCE_ROOT = source_root("mim", Path(__file__).resolve().parents[1] / "MiM")
@@ -24,7 +23,6 @@ REGISTERED_CHECKPOINT_PATH = resolve_external_method_checkpoint_path(
     "mim",
     "checkpoint-final.pth",
 )
-LOCAL_CHECKPOINT_PATH = MIM_SOURCE_ROOT / "checkpoint" / "ckpts.zip"
 DEFAULT_CHECKPOINT_PATH = REGISTERED_CHECKPOINT_PATH
 DEFAULT_CHECKPOINT_NAME = "mim_convvit_base"
 DEFAULT_MODEL_NAME = "MiM ConvViT-B"
@@ -286,7 +284,9 @@ class MiMFeatureExtractor:
             input_size=DEFAULT_CROP_SIZE,
             checkpoint_path=str(checkpoint_path),
             source_commit=SOURCE_COMMIT,
-            checkpoint_sha256=CHECKPOINT_SHA256,
+            checkpoint_sha256=reference_checkpoint_sha256(
+                checkpoint_path, DEFAULT_CHECKPOINT_PATH, CHECKPOINT_SHA256,
+            ),
         )
 
     @torch.inference_mode()

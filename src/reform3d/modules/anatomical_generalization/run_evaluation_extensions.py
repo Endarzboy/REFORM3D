@@ -12,8 +12,6 @@ from pathlib import Path
 from typing import Sequence
 
 from reform3d.core.checkpoints import CHECKPOINT_ORDER, resolve_checkpoint_config
-from reform3d.core.evaluation_summary import write_evaluation_summary
-from reform3d.core.leakage_audit import write_leakage_audit
 from reform3d.core.repeated_seed_runner import repeated_seed_base_argv, run_seeded_module
 from reform3d.core.repeated_seed_summary import write_extension_seed_summary
 from reform3d.core.seed_context import DEFAULT_REPEATED_SEEDS, get_active_seed
@@ -124,8 +122,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--projection-spacing-manifest-variant", default="original_bins")
     parser.add_argument("--projection-spacing-reference-variant", default=None)
     parser.add_argument("--projection-spacing-target-variants", nargs="+", default=None)
-    parser.add_argument("--leakage-audit", action="store_true")
-    parser.add_argument("--write-evaluation-summary", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--python", default=sys.executable)
     args = parser.parse_args(argv)
@@ -175,10 +171,6 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     extension_root.mkdir(parents=True, exist_ok=True)
     artifacts: dict[str, str] = {}
-    if args.leakage_audit:
-        path = extension_root / "leakage_audit.json"
-        write_leakage_audit([manifest_path], path)
-        artifacts["leakage_audit"] = str(path)
 
     metric_records = []
     few_shot_seeds = args.few_shot_seeds or [args.seed]
@@ -262,15 +254,6 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "support_size_sweep_csv": str(support_artifact_dir / "support_size_sweep.csv"),
                 }
             )
-
-    if args.write_evaluation_summary:
-        written = write_evaluation_summary(
-            extension_root,
-            module_name="anatomical_generalization",
-            dataset=dataset_name,
-            manifest_variant=manifest_variant,
-        )
-        artifacts.update({name: str(path) for name, path in written.items()})
 
     _write_json(
         extension_root / "extension_run_manifest.json",

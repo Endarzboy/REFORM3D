@@ -1,4 +1,4 @@
-"""Resolve optional upstream sources without depending on the research checkout."""
+"""Resolve explicitly configured or bundled upstream source directories."""
 
 import os
 import sys

@@ -4,16 +4,20 @@ import argparse
 import contextlib
 import importlib
 import json
+import logging
 import math
 import os
+import platform
 import statistics
 import sys
 import time
 from dataclasses import replace
 from pathlib import Path
-from .settings import artifact_lock, configure_environment, digest, file_hash, load_settings, write_json
+from .settings import MODULES, artifact_lock, configure_environment, digest, file_hash, load_settings, write_json
 from .workspace import (run_directory, module_directory, cache_directory, feature_directory,
-                        reuse_features, link_artifact)
+                        manifest_directory, reuse_features, link_artifact)
+from .core.reproducibility import load_plan, plan_hash, save_plan
+from .core.runtime import deterministic_runtime, seed_runtime
 
 
 def _call(module, arguments):
@@ -25,6 +29,24 @@ def _call(module, arguments):
         sys.argv = old
 
 
+@contextlib.contextmanager
+def _stage_log(path):
+    """Capture a stage without retaining handlers bound to its closed file."""
+    root = logging.getLogger()
+    previous_handlers, previous_level = root.handlers[:], root.level
+    with Path(path).open('a') as stream, contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
+        handler = logging.StreamHandler(stream)
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        root.handlers = [handler]
+        root.setLevel(logging.INFO)
+        try:
+            yield
+        finally:
+            root.handlers = previous_handlers
+            root.setLevel(previous_level)
+            handler.close()
+
+
 def _software_hash():
     root = Path(__file__).parent
     return digest({str(p.relative_to(root)): file_hash(p) for p in sorted(root.rglob('*.py'))})
@@ -34,15 +56,15 @@ def _checkpoints(cfg):
     from .core.checkpoints import CHECKPOINTS, resolve_checkpoint_config
     found = []
     for name in cfg['checkpoints']:
-        item = resolve_checkpoint_config(name)
+        item = resolve_checkpoint_config(name, checkpoint_root=cfg['checkpoint_root'])
         override = cfg['checkpoint_paths'].get(name, cfg['checkpoint_paths'].get(item.checkpoint_key))
         if override:
             item = replace(item, raw_checkpoint_path=Path(override))
-            CHECKPOINTS[item.checkpoint_key] = item
         if not item.path.is_file():
             raise FileNotFoundError(f'Checkpoint {name} missing: {item.path}; set checkpoint_root or checkpoint_paths')
         if any(c.checkpoint_key == item.checkpoint_key for c in found):
             raise ValueError(f'Two aliases select the same checkpoint: {name}')
+        CHECKPOINTS[item.checkpoint_key] = item
         found.append(item)
     return found
 
@@ -102,6 +124,18 @@ def read_metrics(module, path):
     for row in matrix.values():
         for value in row.values():
             _finite(value, 'semantic transfer')
+    per_label = transfer.get('per_label_transfer', {})
+    if not isinstance(per_label, dict) or set(per_label) != set(variants):
+        raise ValueError('Controlled semantic transfer is missing per-label evidence')
+    for train_variant in variants:
+        row = per_label[train_variant]
+        if not isinstance(row, dict) or set(row) != set(variants):
+            raise ValueError('Controlled semantic transfer has incomplete per-label evidence')
+        for scores in row.values():
+            if not isinstance(scores, dict) or not scores:
+                raise ValueError('Controlled semantic transfer has no evaluated labels for a variant pair')
+            for value in scores.values():
+                _finite(value, 'per-label semantic transfer')
     return {'drift': d, 'cka': statistics.mean(values), 'transfer': _finite(transfer['cross_variant_accuracy'], 'transfer')}
 
 
@@ -115,8 +149,18 @@ def _verify_checksum(path, expected):
 def _verified_completed(previous):
     verified = set()
     checked_features = set()
+    plans = previous.get('evaluation_plans', {})
+    for plan in plans.values():
+        if plan_hash(load_plan(plan['path'])) != plan['hash']:
+            raise ValueError(f"Evaluation plan checksum changed: {plan['path']}")
     for entry in previous.get('completed', []):
         _verify_checksum(entry['path'], entry.get('sha256'))
+        if plans:
+            plan = plans.get(f"{entry['module']}:{entry['seed']}")
+            if not plan or entry.get('evaluation_plan_hash') != plan['hash']:
+                raise ValueError('Completed result has incompatible evaluation selections')
+            if json.loads(Path(entry['path']).read_text()).get('evaluation_plan_hash') != plan['hash']:
+                raise ValueError('Result does not identify the expected evaluation plan')
         feature = (entry.get('feature_path'), entry.get('feature_sha256'))
         if not all(feature):
             raise ValueError('Completed result is missing feature integrity provenance')
@@ -165,7 +209,57 @@ def _reports(run_dir, cfg, rows, status='complete'):
     return profile
 
 
-def _run(cfg, *, dry_run=False):
+def _acquisition_protocol(cfg, payload):
+    from .modules.acquisition_robustness.config import ControlledPerturbationConfig, MRI_CONTROLLED_PERTURBATION_CONFIG
+    protocol = replace(MRI_CONTROLLED_PERTURBATION_CONFIG) if payload.get('modality') == 'mr' else ControlledPerturbationConfig()
+    protocol.source_bin = cfg['source_bin']
+    protocol.n_source_volumes = cfg['n_source_volumes']
+    return protocol
+
+
+def _evaluation_plans(cfg, manifest, payload):
+    """Freeze selections once, before any encoder is loaded."""
+    plans = {}
+    for module in cfg['modules']:
+        if module == 'acquisition':
+            from .modules.acquisition_robustness.perturbation_robustness_analysis import build_evaluation_plan
+            inputs = manifest
+            options = {'config': _acquisition_protocol(cfg, payload), 'analysis_name': cfg['dataset'],
+                       'semantic_cache_dir': cache_directory(cfg, 'acquisition', payload['content_hash'][:20]) / 'semantics'}
+        else:
+            package = 'cross_modal_alignment' if module == 'cross_modal' else 'anatomical_generalization'
+            loader = importlib.import_module(f'.modules.{package}.data_loader', __package__)
+            inputs = getattr(loader, f'load_{module}_manifest')(manifest)
+            build_evaluation_plan = importlib.import_module(f'.modules.{package}.evaluation_pipeline', __package__).build_evaluation_plan
+            options = {'required_modalities': cfg['required_modalities'], 'min_samples_per_modality': cfg['min_samples_per_modality']}
+            options.update({'bootstrap_resamples': cfg['bootstrap_resamples']} if module == 'cross_modal'
+                           else {'support_per_modality': cfg['support_per_modality']})
+        for seed in cfg['seeds']:
+            plan = build_evaluation_plan(inputs, seed=seed, **options)
+            if module == 'acquisition' and not plan.get('semantic'):
+                raise ValueError('Acquisition evaluation requires informative semantic labels and valid case-disjoint folds')
+            if module == 'acquisition' and plan['semantic']['case_ids'] != plan['source_case_ids']:
+                raise ValueError('Acquisition semantic labels must cover every selected source case')
+            identity = plan_hash(plan)
+            path = manifest_directory(cfg) / f'{module}-seed{seed}-{identity[:16]}.plan.json'
+            save_plan(path, plan)
+            plans[f'{module}:{seed}'] = {'path': str(path), 'hash': identity}
+    return plans
+
+
+def _evaluation_identity(cfg, payload, weights, software, runtime_versions, execution, plans):
+    # Output locations and worker scheduling do not define an experiment.
+    location_fields = {'workspace', 'run_name', 'data_root', 'manifest', 'label_root',
+                       'checkpoint_root', 'checkpoint_paths', 'device', 'workers', 'checkpoints'}
+    protocol = {key: value for key, value in cfg.items() if key not in location_fields}
+    for key in ('seeds', 'modules', 'feature_types', 'required_modalities'):
+        protocol[key] = sorted(protocol[key])
+    return digest({'protocol': protocol, 'data': payload['content_hash'], 'weights': weights,
+                   'software': software, 'runtime_versions': runtime_versions, 'execution': execution,
+                   'plans': {key: value['hash'] for key, value in plans.items()}})
+
+
+def _run(cfg, *, dry_run=False, execution_policy=None):
     from .prepare import prepare_manifest
     run_dir = configure_environment(cfg)
     checkpoints = _checkpoints(cfg)
@@ -174,27 +268,34 @@ def _run(cfg, *, dry_run=False):
     for module in cfg['modules']:
         (module_directory(cfg, module) / 'logs').mkdir(parents=True, exist_ok=True)
     print('Checking inputs and preparing manifest...', flush=True)
-    with (run_dir / 'logs' / 'preparation.log').open('a') as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+    with _stage_log(run_dir / 'logs' / 'preparation.log'):
         manifest, payload, manifest_hash = prepare_manifest(cfg)
+        plans = _evaluation_plans(cfg, manifest, payload)
     from importlib.metadata import version, PackageNotFoundError
     runtime_versions = {}
-    for name in ('torch', 'numpy', 'monai', 'scipy', 'nibabel', 'SimpleITK', 'Pillow', 'scikit-learn', 'xformers'):
+    runtime_versions['python'] = platform.python_version()
+    for name in ('torch', 'numpy', 'monai', 'scipy', 'nibabel', 'SimpleITK', 'Pillow', 'scikit-learn', 'xformers', 'threadpoolctl'):
         try:
             runtime_versions[name] = version(name)
         except PackageNotFoundError:
             runtime_versions[name] = None
     software = _software_hash()
     package = Path(__file__).parent
-    geometry_sources = ['encoders/med3dino/spacing_aware_transforms.py', 'modules/acquisition_robustness/data_loader.py', 'modules/acquisition_robustness/perturbation_robustness_analysis.py', 'modules/acquisition_robustness/config.py', 'modules/acquisition_robustness/semantic_labels.py', 'modules/cross_modal_alignment/feature_extractor.py', 'modules/cross_modal_alignment/physical_mask.py']
+    geometry_sources = ['encoders/med3dino/spacing_aware_transforms.py', 'modules/acquisition_robustness/data_loader.py', 'modules/acquisition_robustness/perturbation_robustness_analysis.py', 'modules/acquisition_robustness/config.py', 'modules/acquisition_robustness/semantic_labels.py', 'modules/cross_modal_alignment/feature_extractor.py']
     geometry_software = digest({'sources': {name: file_hash(package / name) for name in geometry_sources}, 'runtime': runtime_versions})
     encoder_software = digest({'sources': {str(p.relative_to(package)): file_hash(p) for p in [*sorted((package / 'encoders').rglob('*.py')), package / 'modules/acquisition_robustness/feature_extractor.py']}, 'runtime': runtime_versions})
     weights = {c.checkpoint_key: file_hash(c.path) for c in checkpoints}
     import torch
+    from threadpoolctl import threadpool_info
     device = torch.device(cfg['device'])
-    execution = {'precision': 'float16' if device.type == 'cuda' else 'float32', 'batch_size': cfg['batch_size'], 'device_type': device.type}
+    libraries = [{key: row.get(key) for key in ('internal_api', 'version', 'threading_layer', 'architecture')}
+                 for row in threadpool_info()]
+    execution = {'precision': 'float16' if device.type == 'cuda' else 'float32', 'batch_size': cfg['batch_size'], 'device_type': device.type, 'determinism': execution_policy,
+                 'machine': platform.machine(), 'torch_build': digest(torch.__config__.show()),
+                 'numerical_libraries': sorted(libraries, key=lambda row: json.dumps(row, sort_keys=True))}
     if device.type == 'cuda' and torch.cuda.is_available():
         execution.update(device_name=torch.cuda.get_device_name(device), capability=list(torch.cuda.get_device_capability(device)), cuda=torch.version.cuda, cudnn=torch.backends.cudnn.version())
-    identity = {'configuration': cfg, 'manifest_hash': manifest_hash, 'checkpoint_hashes': weights, 'software_hash': software, 'runtime_versions': runtime_versions, 'execution': execution}
+    identity = {'configuration': cfg, 'manifest_hash': manifest_hash, 'checkpoint_hashes': weights, 'software_hash': software, 'runtime_versions': runtime_versions, 'execution': execution, 'evaluation_plans': plans}
     identity_hash = digest(identity)
     state_path = run_dir / 'run.json'
     previous = {}
@@ -202,7 +303,10 @@ def _run(cfg, *, dry_run=False):
         previous = json.loads(state_path.read_text())
         if previous.get('identity_hash') != identity_hash:
             raise ValueError(f'Run {cfg["run_name"]} already exists with different inputs/configuration/software. Choose a new run_name.')
-    state = {**identity, 'identity_hash': identity_hash, 'manifest': str(manifest), 'status': 'checked' if dry_run else 'prepared', 'completed': [], 'started_unix': time.time()}
+    verified_metrics = _verified_completed(previous) if not dry_run else set()
+    completed = list(previous.get('completed', [])) if not dry_run else []
+    evaluation_hash = _evaluation_identity(cfg, payload, weights, software, runtime_versions, execution, plans)
+    state = {**identity, 'identity_hash': identity_hash, 'evaluation_hash': evaluation_hash, 'manifest': str(manifest), 'status': 'checked' if dry_run else 'prepared', 'completed': completed, 'started_unix': time.time()}
     if dry_run and state_path.exists():
         write_json(run_dir / "check.json", state)
     else:
@@ -219,12 +323,11 @@ def _run(cfg, *, dry_run=False):
         import torch
         if cfg['device'].startswith('cuda') and not torch.cuda.is_available():
             raise RuntimeError('CUDA requested but unavailable; choose device: cpu or install a compatible PyTorch build')
-        verified_metrics = _verified_completed(previous)
-        torch.set_num_threads(min(4, max(1, os.cpu_count() or 1)))
         state['status'] = 'running'
         write_json(state_path, state)
         for checkpoint in checkpoints:
             for feature in cfg['feature_types']:
+                seed_runtime(0)
                 geometry = {'manifest': manifest_hash, 'crop': checkpoint.crop_size, 'bbox_margin': cfg['bbox_margin'], 'outside_organ_mask': cfg['outside_organ_mask'], 'min_mask_voxels': cfg['min_mask_voxels'], 'source_bin': cfg['source_bin'], 'n_source_volumes': cfg['n_source_volumes'], 'software': geometry_software}
                 geometry_id = digest(geometry)[:20]
                 cache = cache_directory(cfg, 'acquisition' if 'acquisition' in cfg['modules'] else 'organs', geometry_id)
@@ -246,12 +349,13 @@ def _run(cfg, *, dry_run=False):
                         if not organ_npz.exists():
                             print(f'Extracting {checkpoint.checkpoint_key}/{feature} organ features...', flush=True)
                             args = ['--manifest', manifest, '--checkpoint', checkpoint.checkpoint_key, '--feature-type', feature, '--output-npz', organ_npz, '--crop-cache-dir', cache, '--batch-size', cfg['batch_size'], '--crop-cache-workers', cfg['workers'], '--device', cfg['device'], '--bbox-margin', cfg['bbox_margin'], '--outside-organ-mask', cfg['outside_organ_mask'], '--min-mask-voxels', cfg['min_mask_voxels']]
-                            with (run_dir / 'logs' / f'{checkpoint.checkpoint_key}-{feature}-extraction.log').open('a') as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+                            with _stage_log(run_dir / 'logs' / f'{checkpoint.checkpoint_key}-{feature}-extraction.log'):
                                 _call('modules.cross_modal_alignment.feature_extractor', args)
                         from .core.features import load_organ_feature_bundle
                         load_organ_feature_bundle(organ_npz, [row['sample_id'] for row in payload['samples']], exact=True)
                         _feature_provenance(bundle / 'identity.json', feature_identity, feature_artifact, seal=True)
                     for seed in cfg['seeds']:
+                        seed_runtime(seed)
                         os.environ['MED3DINO_REFORM3D_ACTIVE_SEED'] = str(seed)
                         for module in cfg['modules']:
                             module_dir = module_directory(cfg, module)
@@ -266,15 +370,15 @@ def _run(cfg, *, dry_run=False):
                             os.environ['REFORM3D_ENCODER_DIR'] = str(leaf)
                             os.environ['REFORM3D_CACHE_DIR'] = str(cache)
                             metric_file = leaf / (module + '.json')
+                            plan = plans[f'{module}:{seed}']
                             print(f'Evaluating {module}: {checkpoint.checkpoint_key}/{feature}, seed {seed}', flush=True)
-                            with (module_dir / 'logs' / f'{checkpoint.checkpoint_key}-{feature}-{module}-seed{seed}.log').open('a') as log, contextlib.redirect_stdout(log), contextlib.redirect_stderr(log):
+                            with _stage_log(module_dir / 'logs' / f'{checkpoint.checkpoint_key}-{feature}-{module}-seed{seed}.log'):
                                 if str(metric_file.resolve()) not in verified_metrics:
                                     if module == 'acquisition':
-                                        from .modules.acquisition_robustness.config import ControlledPerturbationConfig, MRI_CONTROLLED_PERTURBATION_CONFIG
+                                        seed_runtime(0)
                                         from .modules.acquisition_robustness.perturbation_robustness_analysis import run_controlled_perturbation
-                                        protocol = replace(MRI_CONTROLLED_PERTURBATION_CONFIG) if payload.get('modality') == 'mr' else ControlledPerturbationConfig()
-                                        protocol.source_bin = cfg['source_bin']; protocol.n_source_volumes = cfg['n_source_volumes']
-                                        result = run_controlled_perturbation(manifest, checkpoint.checkpoint_key, feature_type=feature, config=protocol, output_dir=leaf, figures_dir=leaf / 'figures', cache_dir=cache, semantic_cache_dir=cache / 'semantics', analysis_name=cfg['dataset'], random_state=seed, compute_matched_semantic_probing=False, compute_drift_figure=False, feature_cache_path=feature_artifact, device=cfg['device'], batch_size=cfg['batch_size'])
+                                        protocol = _acquisition_protocol(cfg, payload)
+                                        result = run_controlled_perturbation(manifest, checkpoint.checkpoint_key, feature_type=feature, config=protocol, output_dir=leaf, figures_dir=leaf / 'figures', cache_dir=cache, semantic_cache_dir=cache_directory(cfg, 'acquisition', payload['content_hash'][:20]) / 'semantics', analysis_name=cfg['dataset'], random_state=seed, compute_matched_semantic_probing=False, compute_drift_figure=False, feature_cache_path=feature_artifact, device=cfg['device'], batch_size=cfg['batch_size'], evaluation_plan=load_plan(plan['path']))
                                         expected = sum(v['anisotropy_bin'] == protocol.source_bin for v in payload['volumes'])
                                         if protocol.n_source_volumes:
                                             expected = min(expected, protocol.n_source_volumes)
@@ -284,14 +388,18 @@ def _run(cfg, *, dry_run=False):
                                         write_json(metric_file, json.loads(original.read_text()))
                                     elif module == 'cross_modal':
                                         if cfg['dataset'] == 'chaos_ct_mr':
-                                            raise ValueError('CHAOS uses the separate single-organ protocol; use its reproduction entry point')
-                                        _call('modules.cross_modal_alignment.evaluation_pipeline', ['--manifest', manifest, '--analysis-name', cfg['dataset'], '--manifest-variant', 'core', '--embeddings-npz', organ_npz, '--checkpoint-name', checkpoint.checkpoint_key, '--feature-type', feature, '--metrics-output', metric_file, '--summary-output-dir', leaf / 'cohort', '--retrieval-diagnostics-output', leaf / 'retrieval_diagnostics.json', '--seed', seed, '--bootstrap-resamples', cfg['bootstrap_resamples'], '--bbox-margin', cfg['bbox_margin'], '--outside-organ-mask', cfg['outside_organ_mask'], '--required-modalities', *cfg['required_modalities']])
+                                            raise ValueError('CHAOS uses the single-organ protocol; use python -m reform3d.modules.cross_modal_alignment.run_cross_modal_alignment --dataset chaos_ct_mr')
+                                        _call('modules.cross_modal_alignment.evaluation_pipeline', ['--manifest', manifest, '--analysis-name', cfg['dataset'], '--manifest-variant', 'core', '--embeddings-npz', organ_npz, '--checkpoint-name', checkpoint.checkpoint_key, '--feature-type', feature, '--metrics-output', metric_file, '--summary-output-dir', leaf / 'cohort', '--retrieval-diagnostics-output', leaf / 'retrieval_diagnostics.json', '--evaluation-plan', plan['path'], '--seed', seed, '--bootstrap-resamples', cfg['bootstrap_resamples'], '--min-samples-per-modality', cfg['min_samples_per_modality'], '--bbox-margin', cfg['bbox_margin'], '--outside-organ-mask', cfg['outside_organ_mask'], '--required-modalities', *cfg['required_modalities']])
                                     else:
-                                        _call('modules.anatomical_generalization.evaluation_pipeline', ['--manifest', manifest, '--analysis-name', cfg['dataset'], '--manifest-variant', 'core', '--embeddings-npz', organ_npz, '--checkpoint-name', checkpoint.checkpoint_key, '--feature-type', feature, '--output-path', metric_file, '--manifest-summary-output-dir', leaf / 'cohort', '--seed', seed, '--few-shot-seeds', seed, '--few-shot-support-per-modality', cfg['support_per_modality'], '--required-modalities', *cfg['required_modalities'], '--min-samples-per-modality', cfg['min_samples_per_modality']])
+                                        _call('modules.anatomical_generalization.evaluation_pipeline', ['--manifest', manifest, '--analysis-name', cfg['dataset'], '--manifest-variant', 'core', '--embeddings-npz', organ_npz, '--checkpoint-name', checkpoint.checkpoint_key, '--feature-type', feature, '--output-path', metric_file, '--manifest-summary-output-dir', leaf / 'cohort', '--evaluation-plan', plan['path'], '--seed', seed, '--few-shot-seeds', seed, '--few-shot-support-per-modality', cfg['support_per_modality'], '--required-modalities', *cfg['required_modalities'], '--min-samples-per-modality', cfg['min_samples_per_modality']])
+                                    result_payload = json.loads(metric_file.read_text())
+                                    if result_payload.get('evaluation_plan_hash') != plan['hash']:
+                                        raise ValueError('Evaluator used different selections from the run plan')
                                 feature_sha = _feature_provenance(local_features / 'identity.json', feature_identity, feature_artifact, seal=True)
                                 metrics = read_metrics(module, metric_file)
                             rows.extend({'checkpoint': checkpoint.checkpoint_key, 'feature': feature, 'module': module, 'metric': key, 'seed': seed, 'value': value, 'path': str(metric_file)} for key, value in metrics.items())
-                            state['completed'].append({'checkpoint': checkpoint.checkpoint_key, 'feature': feature, 'module': module, 'seed': seed, 'path': str(metric_file), 'sha256': file_hash(metric_file), 'feature_path': str(feature_artifact), 'feature_sha256': feature_sha})
+                            if str(metric_file.resolve()) not in verified_metrics:
+                                state['completed'].append({'checkpoint': checkpoint.checkpoint_key, 'feature': feature, 'module': module, 'seed': seed, 'path': str(metric_file), 'sha256': file_hash(metric_file), 'feature_path': str(feature_artifact), 'feature_sha256': feature_sha, 'evaluation_plan_hash': plan['hash']})
                             write_json(state_path, state)
         _reports(run_dir, report_cfg, rows)
         state['status'] = 'complete'; state['elapsed_seconds'] = time.time() - state['started_unix']
@@ -314,7 +422,13 @@ def _run(cfg, *, dry_run=False):
 def run(cfg, *, dry_run=False):
     run_dir = run_directory(cfg)
     legacy = Path(cfg['workspace']) / 'runs' / cfg['run_name']
-    if legacy.exists() and not legacy.is_symlink() and not run_dir.exists():
+    # A run name may also be a dataset name; namespace folders contain modules.
+    namespace_modules = MODULES | {'_runs'}
+    dataset_namespace = legacy.is_dir() and not legacy.is_symlink() and all(
+        child.name in namespace_modules and child.is_dir() and not child.is_symlink()
+        for child in legacy.iterdir()
+    )
+    if legacy.exists() and not legacy.is_symlink() and not dataset_namespace and not (run_dir / 'run.json').is_file():
         raise ValueError(f'Legacy run exists at {legacy}. Choose a new run_name to preserve its outputs.')
     destinations = {run_dir, *(module_directory(cfg, module) for module in cfg['modules'])}
     with contextlib.ExitStack() as locks:
@@ -330,7 +444,8 @@ def run(cfg, *, dry_run=False):
                 raise ValueError(f'Module directory has outputs without a run receipt: {directory}; choose a new run_name.')
         for directory in destinations - {run_dir}:
             link_artifact(run_dir / 'run.json', directory / 'run.json')
-        return _run(cfg, dry_run=dry_run)
+        with deterministic_runtime() as policy:
+            return _run(cfg, dry_run=dry_run, execution_policy=policy)
 
 
 def refresh_report(run_dir):

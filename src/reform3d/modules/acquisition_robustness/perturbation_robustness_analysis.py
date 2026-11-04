@@ -45,6 +45,7 @@ from monai.transforms import (
 from reform3d.encoders.med3dino.spacing_aware_transforms import CropForegroundSwapSliceDimsV2
 
 from reform3d.core.paths import get_reform3d_cache_path_candidates
+from reform3d.core.reproducibility import canonical_records, plan_hash
 
 try:
     from .config import (
@@ -587,11 +588,30 @@ def resample_volume(
         del base_image
 
 
+def _source_records(manifest: Dict[str, Any], config: ControlledPerturbationConfig) -> List[Dict[str, Any]]:
+    """Select the source cohort in stable case order before applying its limit."""
+    records = canonical_records(manifest["volumes"], kind="volumes")
+    records = [record for record in records if record["anisotropy_bin"] == config.source_bin]
+    if config.n_source_volumes is not None:
+        records = records[:config.n_source_volumes]
+    if not records:
+        raise ValueError("No eligible controlled source volumes")
+    if len({str(record["file_path"]) for record in records}) != len(records):
+        raise ValueError("Controlled source cases must have unique image paths")
+    return records
+
+
+def _patient_id(record: Dict[str, Any]) -> str:
+    return str(record.get("patient_id") or record.get("subject_id")
+               or record.get("source_case_id") or record["case_id"])
+
+
 def prepare_perturbed_dataset(
     manifest_path: Union[str, Path],
     config: Optional[ControlledPerturbationConfig] = None,
     crop_size: int = 96,
     cache_dir: Optional[Path] = None,
+    source_case_ids: Optional[List[str]] = None,
 ) -> List[PerturbedVolume]:
     """
     Prepare a dataset of perturbed volumes from the configured native-observational source bin.
@@ -612,15 +632,10 @@ def prepare_perturbed_dataset(
     with open(manifest_path) as f:
         manifest = json.load(f)
 
-    volumes = manifest["volumes"]
-
-    # Filter to source bin (isotropic volumes)
-    source_volumes = [v for v in volumes if v["anisotropy_bin"] == config.source_bin]
-    logger.info(f"Found {len(source_volumes)} volumes in source bin {config.source_bin}")
-
-    # Limit if specified
-    if config.n_source_volumes is not None:
-        source_volumes = source_volumes[:config.n_source_volumes]
+    source_volumes = _source_records(manifest, config)
+    if source_case_ids is not None:
+        if [record["case_id"] for record in source_volumes] != source_case_ids:
+            raise ValueError("Controlled source cases differ from the evaluation plan")
 
     logger.info(f"Processing {len(source_volumes)} volumes")
 
@@ -1001,15 +1016,20 @@ def _load_controlled_features(
     feature_type: str,
     dataset_name: str,
 ) -> Tuple[Dict[str, np.ndarray], bool]:
-    """Read the analysis bundle, accepting the old extraction schema for migration."""
+    """Read a compatible bundle and align its rows to the selected source cases."""
     expected_names = config.describe_targets() + list(config.extra_perturbations or [])
     expected_paths = [str(volume.original_path) for volume in volumes]
     try:
         with np.load(path, allow_pickle=False) as bundle:
             rich_bundle = "case_ids" in bundle
             case_key = "case_ids" if rich_bundle else "source_paths"
-            if bundle[case_key].tolist() != expected_paths:
-                raise ValueError("Controlled feature cache has different source cases or case order")
+            stored_paths = bundle[case_key].tolist()
+            if (not isinstance(stored_paths, list) or len(stored_paths) != len(set(stored_paths))
+                    or len(expected_paths) != len(set(expected_paths))
+                    or set(stored_paths) != set(expected_paths)):
+                raise ValueError("Controlled feature cache has duplicate or different source cases")
+            row_by_path = {path: index for index, path in enumerate(stored_paths)}
+            row_order = [row_by_path[path] for path in expected_paths]
             names = bundle["variant_names"].tolist()
             if len(names) != len(set(names)) or set(names) != set(expected_names):
                 raise ValueError("Controlled feature cache has duplicate or incomplete protocol variants")
@@ -1023,15 +1043,19 @@ def _load_controlled_features(
                 for key, expected in identity.items():
                     if bundle[key].shape != () or bundle[key].item() != expected:
                         raise ValueError(f"Controlled embedding bundle has different {key}")
-                expected_metadata = _resolve_variant_metadata(config, volumes, names)
+                volume_by_path = {str(volume.original_path): volume for volume in volumes}
+                stored_volumes = [volume_by_path[path] for path in stored_paths]
+                expected_metadata = _resolve_variant_metadata(config, stored_volumes, names)
                 if not np.array_equal(bundle["target_spacings_mm"], expected_metadata["target_spacings_mm"], equal_nan=True):
                     raise ValueError("Controlled embedding bundle has different target spacings")
                 if bundle["reference_variant_name"].item() != expected_names[0]:
                     raise ValueError("Controlled embedding bundle has a different reference variant")
-            features = {
-                name: bundle[f"features__{name}" if rich_bundle else f"features_{index}"].copy()
-                for index, name in enumerate(names)
-            }
+            features = {}
+            for index, name in enumerate(names):
+                array = bundle[f"features__{name}" if rich_bundle else f"features_{index}"]
+                if array.ndim != 2 or len(array) != len(stored_paths):
+                    raise ValueError("Controlled feature cache has incomplete feature rows")
+                features[name] = array[row_order].copy()
     except (KeyError, OSError, TypeError) as error:
         raise ValueError(f"Incomplete or unreadable controlled embedding bundle: {path}") from error
     return features, rich_bundle
@@ -1041,6 +1065,7 @@ def _build_matched_split_indices(
     semantic_labels: np.ndarray,
     n_splits: int = 5,
     random_state: int = 42,
+    case_ids: Optional[List[str]] = None,
 ) -> List[Tuple[np.ndarray, np.ndarray]]:
     """Build shared case-disjoint folds for matched semantic evaluation.
 
@@ -1049,6 +1074,12 @@ def _build_matched_split_indices(
     because sklearn does not provide iterative multilabel stratification.
     """
     n_samples = len(semantic_labels)
+    order = np.arange(n_samples)
+    if case_ids is not None:
+        if len(case_ids) != n_samples or len(set(case_ids)) != n_samples:
+            raise ValueError("Matched semantic evaluation requires unique case IDs for every row")
+        order = np.argsort(np.asarray(case_ids, dtype=str), kind="stable")
+        semantic_labels = semantic_labels[order]
     effective_splits = min(n_splits, n_samples)
     if effective_splits < 2:
         raise ValueError("Matched semantic evaluation requires at least two samples")
@@ -1063,10 +1094,10 @@ def _build_matched_split_indices(
         unique_classes, counts = np.unique(stratify_labels, return_counts=True)
         if len(unique_classes) > 1 and counts.min() >= effective_splits:
             splitter = StratifiedKFold(n_splits=effective_splits, shuffle=True, random_state=random_state)
-            return [(train_idx, test_idx) for train_idx, test_idx in splitter.split(np.zeros(n_samples), stratify_labels)]
+            return [(order[train_idx], order[test_idx]) for train_idx, test_idx in splitter.split(np.zeros(n_samples), stratify_labels)]
 
     splitter = KFold(n_splits=effective_splits, shuffle=True, random_state=random_state)
-    return [(train_idx, test_idx) for train_idx, test_idx in splitter.split(np.zeros(n_samples))]
+    return [(order[train_idx], order[test_idx]) for train_idx, test_idx in splitter.split(np.zeros(n_samples))]
 
 
 def _cross_validated_multilabel_balanced_accuracy(
@@ -1077,7 +1108,7 @@ def _cross_validated_multilabel_balanced_accuracy(
 ) -> Tuple[float, Dict[int, float]]:
     """Evaluate multi-label balanced accuracy with shared precomputed folds."""
     if semantic_labels.ndim != 2 or semantic_labels.shape[1] == 0:
-        return 0.0, {}
+        raise ValueError("Matched semantic probing requires a nonempty 2D target matrix")
 
     per_label_scores: Dict[int, List[float]] = {label_idx: [] for label_idx in range(semantic_labels.shape[1])}
 
@@ -1097,21 +1128,23 @@ def _cross_validated_multilabel_balanced_accuracy(
                 max_iter=1000,
                 solver="lbfgs",
                 random_state=random_state,
-                n_jobs=4,
+                n_jobs=1,
             )
             try:
                 clf.fit(X_train, y_train)
                 predictions = clf.predict(X_test)
                 per_label_scores[label_idx].append(float(balanced_accuracy_score(y_test, predictions)))
             except Exception as e:
-                logger.warning(f"Matched semantic probe failed for label {label_idx}: {e}")
+                raise RuntimeError(f"Matched semantic probe failed for label {label_idx}") from e
 
     mean_per_label = {
         label_idx: float(np.mean(scores))
         for label_idx, scores in per_label_scores.items()
         if scores
     }
-    mean_score = float(np.mean(list(mean_per_label.values()))) if mean_per_label else 0.0
+    if not mean_per_label:
+        raise ValueError("No evaluable semantic targets for matched semantic probing")
+    mean_score = float(np.mean(list(mean_per_label.values())))
     return mean_score, mean_per_label
 
 
@@ -1124,8 +1157,9 @@ def _train_and_evaluate_multilabel_transfer_once(
     min_class_count: int = 2,
 ) -> Tuple[float, Dict[int, float]]:
     """Train one classifier per label on one variant and evaluate on another."""
-    if train_labels.ndim != 2 or test_labels.ndim != 2 or train_labels.shape[1] == 0:
-        return 0.0, {}
+    if (train_labels.ndim != 2 or test_labels.ndim != 2 or train_labels.shape[1] == 0
+            or train_labels.shape[1] != test_labels.shape[1]):
+        raise ValueError("Matched semantic transfer requires matching nonempty 2D target matrices")
 
     scaler = StandardScaler()
     train_scaled = scaler.fit_transform(train_features)
@@ -1150,7 +1184,7 @@ def _train_and_evaluate_multilabel_transfer_once(
             max_iter=1000,
             solver="lbfgs",
             random_state=random_state,
-            n_jobs=4,
+            n_jobs=1,
         )
         try:
             clf.fit(train_scaled, y_train)
@@ -1159,7 +1193,7 @@ def _train_and_evaluate_multilabel_transfer_once(
             per_label_scores[label_idx] = score
             valid_scores.append(score)
         except Exception as e:
-            logger.warning(f"Matched semantic transfer failed for label {label_idx}: {e}")
+            raise RuntimeError(f"Matched semantic transfer failed for label {label_idx}") from e
 
     if not valid_scores:
         return 0.0, {}
@@ -1199,13 +1233,16 @@ def _load_matched_semantic_targets(
         logger.warning("No informative semantic targets available for matched perturbation semantics")
         return None, [], semantic_metadata, None
 
-    path_to_index = {path: idx for idx, path in enumerate(semantic_paths)}
+    path_to_index = {str(Path(path).resolve()): idx for idx, path in enumerate(semantic_paths)}
+    if len(path_to_index) != len(semantic_paths):
+        raise ValueError("Semantic targets contain duplicate image paths")
     valid_indices: List[int] = []
     aligned_labels: List[np.ndarray] = []
     for sample_index, volume in enumerate(perturbed_volumes):
-        if volume.original_path in path_to_index:
+        path = str(Path(volume.original_path).resolve())
+        if path in path_to_index:
             valid_indices.append(sample_index)
-            aligned_labels.append(semantic_labels_full[path_to_index[volume.original_path]])
+            aligned_labels.append(semantic_labels_full[path_to_index[path]])
 
     if len(aligned_labels) < 10:
         logger.warning(
@@ -1221,6 +1258,127 @@ def _load_matched_semantic_targets(
     )
 
 
+def _evaluation_plan_context(
+    manifest_path: Union[str, Path], *, seed: int,
+    config: Optional[ControlledPerturbationConfig], analysis_name: str,
+    semantic_cache_dir: Optional[Path], compute_matched_semantics: bool,
+) -> Tuple[Dict[str, Any], Any, Any, Any]:
+    with open(manifest_path) as handle:
+        manifest = json.load(handle)
+    config = config or (MRI_CONTROLLED_PERTURBATION_CONFIG
+                        if manifest.get("modality") == "mr" else CONTROLLED_PERTURBATION_CONFIG)
+    records = _source_records(manifest, config)
+    case_ids = [record["case_id"] for record in records]
+    patient_ids = [_patient_id(record) for record in records]
+    context = {
+        "schema_version": 1, "module": "acquisition", "seed": int(seed),
+        "dataset": analysis_name if analysis_name != "default" else manifest.get("dataset"),
+        "protocol": {"geometry": config.cache_signature(), "n_source_volumes": config.n_source_volumes},
+        "source_case_ids": case_ids, "source_patient_ids": patient_ids, "semantic": None,
+    }
+    labels, metadata, valid_indices = None, None, None
+    if compute_matched_semantics:
+        descriptors = [PerturbedVolume(
+            original_path=str(record["file_path"]), original_spacing=tuple(record["spacing"]),
+            dataset=record.get("dataset", manifest.get("dataset", "unknown")),
+            has_label=record.get("has_label", False),
+        ) for record in records]
+        labels, names, metadata, valid_indices = _load_matched_semantic_targets(
+            manifest_path, descriptors, semantic_cache_dir,
+        )
+        if labels is not None and valid_indices is not None:
+            selected_ids = [case_ids[index] for index in valid_indices]
+            selected_patients = [patient_ids[index] for index in valid_indices]
+            if len(set(selected_patients)) != len(selected_patients):
+                raise ValueError(
+                    "Matched acquisition evaluation supports one source scan per patient; "
+                    "select one scan for each patient to avoid train/test leakage"
+                )
+            if (labels.ndim != 2 or len(labels) != len(selected_ids)
+                    or len(names) != labels.shape[1] or not np.isfinite(labels).all()
+                    or not np.isin(labels, [0, 1]).all()):
+                raise ValueError("Invalid matched semantic targets for the evaluation plan")
+            context["semantic"] = {
+                "case_ids": selected_ids, "patient_ids": selected_patients, "label_names": names,
+                "target_hash": plan_hash({"case_ids": selected_ids, "label_names": names,
+                                          "labels": labels.astype(int).tolist()}),
+            }
+    return context, labels, metadata, valid_indices
+
+
+def build_evaluation_plan(
+    manifest_path: Union[str, Path], *, seed: int,
+    config: Optional[ControlledPerturbationConfig] = None, analysis_name: str = "default",
+    semantic_cache_dir: Optional[Path] = None, compute_matched_semantics: bool = True,
+) -> Dict[str, Any]:
+    """Choose source cases and shared patient folds before encoder inference."""
+    plan, labels, _, _ = _evaluation_plan_context(
+        manifest_path, seed=seed, config=config, analysis_name=analysis_name,
+        semantic_cache_dir=semantic_cache_dir, compute_matched_semantics=compute_matched_semantics,
+    )
+    return _add_semantic_folds(plan, labels)
+
+
+def _add_semantic_folds(plan: Dict[str, Any], labels: Optional[np.ndarray]) -> Dict[str, Any]:
+    semantic = plan["semantic"]
+    if semantic is not None:
+        ids, patients = semantic["case_ids"], semantic["patient_ids"]
+        folds = _build_matched_split_indices(labels, random_state=plan["seed"], case_ids=ids)
+        semantic["folds"] = [{
+            "train_case_ids": [ids[index] for index in train],
+            "test_case_ids": [ids[index] for index in test],
+            "train_patient_ids": [patients[index] for index in train],
+            "test_patient_ids": [patients[index] for index in test],
+        } for train, test in folds]
+    return plan
+
+
+def _planned_folds(plan: Dict[str, Any], context: Dict[str, Any]) -> Optional[List[Tuple[np.ndarray, np.ndarray]]]:
+    """Validate the recorded protocol and resolve its explicit case assignments."""
+    if not isinstance(plan, dict) or set(plan) != set(context):
+        raise ValueError("Invalid acquisition evaluation plan")
+    for key, expected in context.items():
+        if key != "semantic" and plan[key] != expected:
+            raise ValueError(f"Acquisition evaluation plan has different {key}")
+    expected_semantic = context["semantic"]
+    semantic = plan["semantic"]
+    if expected_semantic is None:
+        if semantic is not None:
+            raise ValueError("Evaluation plan requires unavailable semantic targets")
+        return None
+    if (not isinstance(semantic, dict) or set(semantic) != {*expected_semantic, "folds"}
+            or any(semantic.get(key) != value for key, value in expected_semantic.items())):
+        raise ValueError("Acquisition evaluation plan has different semantic targets")
+    ids = semantic["case_ids"]
+    lookup = {case_id: index for index, case_id in enumerate(ids)}
+    patient_lookup = dict(zip(ids, semantic["patient_ids"]))
+    all_ids, test_ids, indices = set(ids), [], []
+    folds = semantic["folds"]
+    if not isinstance(folds, list) or len(folds) != min(5, len(ids)):
+        raise ValueError("Acquisition evaluation plan has incomplete folds")
+    for fold in folds:
+        if not isinstance(fold, dict):
+            raise ValueError("Invalid acquisition evaluation plan fold")
+        train, test = fold.get("train_case_ids", []), fold.get("test_case_ids", [])
+        if (not isinstance(train, list) or not isinstance(test, list)
+                or not all(isinstance(item, str) for item in train + test)
+                or not train or not test or len(set(train)) != len(train) or len(set(test)) != len(test)
+                or set(train) & set(test) or set(train) | set(test) != all_ids):
+            raise ValueError("Acquisition plan folds must partition all eligible cases without leakage")
+        train_patients = [patient_lookup[case_id] for case_id in train]
+        test_patients = [patient_lookup[case_id] for case_id in test]
+        if (set(train_patients) & set(test_patients)
+                or fold.get("train_patient_ids") != train_patients
+                or fold.get("test_patient_ids") != test_patients):
+            raise ValueError("Acquisition evaluation plan has inconsistent patient assignments")
+        indices.append((np.asarray([lookup[item] for item in train], dtype=np.int64),
+                        np.asarray([lookup[item] for item in test], dtype=np.int64)))
+        test_ids.extend(test)
+    if len(test_ids) != len(ids) or set(test_ids) != all_ids:
+        raise ValueError("Every semantic case must appear in exactly one test fold")
+    return indices
+
+
 def run_matched_semantic_probing(
     features_by_spacing: Dict[str, np.ndarray],
     semantic_labels: np.ndarray,
@@ -1230,9 +1388,11 @@ def run_matched_semantic_probing(
     output_dir: Path,
     n_cv_splits: int = 5,
     random_state: int = 42,
+    fold_indices: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
 ) -> Dict[str, Any]:
     """Evaluate semantic accessibility independently for each perturbation variant."""
-    fold_indices = _build_matched_split_indices(semantic_labels, n_splits=n_cv_splits, random_state=random_state)
+    if fold_indices is None:
+        fold_indices = _build_matched_split_indices(semantic_labels, n_splits=n_cv_splits, random_state=random_state)
 
     variant_scores: Dict[str, float] = {}
     per_label_scores: Dict[str, Dict[int, float]] = {}
@@ -1275,9 +1435,13 @@ def compute_matched_semantic_transfer(
     feature_type: str,
     n_cv_splits: int = 5,
     random_state: int = 42,
+    fold_indices: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
 ) -> Dict[str, Any]:
     """Compute semantic transfer between perturbation variants with shared folds."""
-    fold_indices = _build_matched_split_indices(semantic_labels, n_splits=n_cv_splits, random_state=random_state)
+    if semantic_labels.ndim != 2 or semantic_labels.shape[1] == 0:
+        raise ValueError("Matched semantic transfer requires a nonempty 2D target matrix")
+    if fold_indices is None:
+        fold_indices = _build_matched_split_indices(semantic_labels, n_splits=n_cv_splits, random_state=random_state)
     variant_names = list(features_by_spacing.keys())
 
     transfer_matrix: Dict[str, Dict[str, float]] = {name: {} for name in variant_names}
@@ -1296,12 +1460,16 @@ def compute_matched_semantic_transfer(
                     semantic_labels[test_idx],
                     random_state=random_state,
                 )
-                if score > 0:
+                if label_scores:
                     fold_scores.append(score)
                 for label_idx, label_score in label_scores.items():
                     label_score_lists[label_idx].append(label_score)
 
-            transfer_matrix[train_variant][test_variant] = float(np.mean(fold_scores)) if fold_scores else 0.0
+            if not fold_scores:
+                raise ValueError(
+                    f"No evaluable semantic targets for transfer {train_variant} -> {test_variant}"
+                )
+            transfer_matrix[train_variant][test_variant] = float(np.mean(fold_scores))
             per_label_transfer[train_variant][test_variant] = {
                 label_idx: float(np.mean(scores))
                 for label_idx, scores in label_score_lists.items()
@@ -1348,6 +1516,7 @@ def run_matched_semantic_transfer(
     output_dir: Path,
     n_cv_splits: int = 5,
     random_state: int = 42,
+    fold_indices: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None,
 ) -> Dict[str, Any]:
     """Evaluate semantic transfer between perturbation variants with shared folds."""
     results = compute_matched_semantic_transfer(
@@ -1358,6 +1527,7 @@ def run_matched_semantic_transfer(
         feature_type,
         n_cv_splits=n_cv_splits,
         random_state=random_state,
+        fold_indices=fold_indices,
     )
 
     results_path = output_dir / "matched_semantic_transfer.json"
@@ -1509,6 +1679,7 @@ def run_controlled_perturbation(
     feature_cache_path: Optional[Path] = None,
     device: str = "cuda",
     batch_size: int = 1,
+    evaluation_plan: Optional[Dict[str, Any]] = None,
 ) -> ControlledPerturbationResults:
     """
     Run controlled spacing perturbation experiments.
@@ -1586,9 +1757,26 @@ def run_controlled_perturbation(
     ckpt_config = CHECKPOINTS[checkpoint_name]
     crop_size = ckpt_config.crop_size
 
+    if compute_matched_semantic_probing is None:
+        compute_matched_semantic_probing = compute_matched_semantics
+    if compute_matched_semantic_transfer is None:
+        compute_matched_semantic_transfer = compute_matched_semantics
+    compute_any_matched_semantics = bool(compute_matched_semantic_probing or compute_matched_semantic_transfer)
+    shared_semantic_cache_dir = semantic_cache_dir or get_output_paths(dataset_name, manifest_variant)["results"]
+    context, semantic_labels, semantic_metadata, valid_indices = _evaluation_plan_context(
+        manifest_path, seed=random_state, config=config, analysis_name=analysis_name,
+        semantic_cache_dir=shared_semantic_cache_dir,
+        compute_matched_semantics=compute_any_matched_semantics,
+    )
+    if evaluation_plan is None:
+        # Direct API calls follow the same policy as the persisted CLI plans.
+        evaluation_plan = _add_semantic_folds(json.loads(json.dumps(context)), semantic_labels)
+    fold_indices = _planned_folds(evaluation_plan, context)
+
     # Prepare perturbed dataset (using the effective cache dir)
     perturbed_volumes = prepare_perturbed_dataset(
-        manifest_path, config, crop_size, cache_dir=effective_cache_dir
+        manifest_path, config, crop_size, cache_dir=effective_cache_dir,
+        source_case_ids=evaluation_plan["source_case_ids"],
     )
 
     if not perturbed_volumes:
@@ -1662,23 +1850,9 @@ def run_controlled_perturbation(
     # Compute matched semantic probing/transfer if semantic targets are available.
     matched_semantic_probing = None
     matched_semantic_transfer = None
-    semantic_metadata = None
-    if compute_matched_semantic_probing is None:
-        compute_matched_semantic_probing = compute_matched_semantics
-    if compute_matched_semantic_transfer is None:
-        compute_matched_semantic_transfer = compute_matched_semantics
-    compute_any_matched_semantics = bool(compute_matched_semantic_probing or compute_matched_semantic_transfer)
-    # Use a shared dataset-level directory for semantic label cache so that
-    # parallel checkpoint/feature-type runs reuse one extraction pass instead
-    # of each re-extracting the full manifest independently.
-    shared_semantic_cache_dir = semantic_cache_dir or get_output_paths(dataset_name, manifest_variant)["results"]
     if compute_any_matched_semantics:
-        semantic_labels, label_names, semantic_metadata, valid_indices = _load_matched_semantic_targets(
-            manifest_path,
-            perturbed_volumes,
-            shared_semantic_cache_dir,
-        )
         if semantic_labels is not None and valid_indices is not None:
+            label_names = evaluation_plan["semantic"]["label_names"]
             semantic_features_by_spacing = {
                 spacing_name: spacing_features[valid_indices]
                 for spacing_name, spacing_features in features_by_spacing.items()
@@ -1693,6 +1867,7 @@ def run_controlled_perturbation(
                     feature_type,
                     output_dir,
                     random_state=random_state,
+                    fold_indices=fold_indices,
                 )
             else:
                 logger.info("Skipping matched controlled semantic probing")
@@ -1707,6 +1882,7 @@ def run_controlled_perturbation(
                     feature_type,
                     output_dir,
                     random_state=random_state,
+                    fold_indices=fold_indices,
                 )
             else:
                 logger.info("Skipping matched controlled semantic transfer")
@@ -1785,6 +1961,7 @@ def run_controlled_perturbation(
         "matched_semantic_probing": matched_semantic_probing,
         "matched_semantic_transfer": matched_semantic_transfer,
         "semantic_metadata": semantic_metadata,
+        "evaluation_plan_hash": plan_hash(evaluation_plan),
         "drift_figure": "drift_curve.png" if compute_drift_figure else None,
         "drift_figure_skipped": not compute_drift_figure,
         # "per_sample_distances": per_sample_json,  # Large, omit by default

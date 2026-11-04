@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
 
 from .config import DEFAULT_REQUIRED_MODALITIES
-from .path_resolution import normalize_totalsegmenter_ct_record
 
 
 ORGAN_KEY_CANDIDATES: Tuple[str, ...] = (
@@ -85,12 +84,13 @@ def load_cross_modal_manifest(manifest_path: str | Path) -> List[Dict[str, Any]]
         raw_samples = payload
 
     normalized_samples: List[Dict[str, Any]] = []
-    for index, sample in enumerate(raw_samples):
+    for sample in raw_samples:
         if not isinstance(sample, dict):
-            continue
+            raise ValueError("Cross-modal manifest records must be objects")
 
-        sample = normalize_totalsegmenter_ct_record(sample)
-        sample_id = sample.get("sample_id") or sample.get("id") or sample.get("file_path") or f"sample_{index:06d}"
+        sample_id = sample.get("sample_id") or sample.get("id")
+        if not isinstance(sample_id, str) or not sample_id.strip():
+            raise ValueError("Every cross-modal manifest record requires an explicit stable sample_id or id")
         organs = _extract_organs(sample)
         normalized_samples.append(
             {

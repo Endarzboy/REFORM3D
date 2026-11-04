@@ -1,24 +1,10 @@
-"""
-Spacing-aware transforms for handling extreme anisotropy in medical imaging datasets.
+"""Spacing-aware cropping and augmentation helpers for 3D medical volumes.
 
-This module provides transforms that respect physical spacing to ensure:
-1. Consistent anatomical extent across varying resolutions
-2. Proper handling of extreme anisotropy (up to 5×+ ratios)
-3. Rotation-aware augmentation that gates cross-plane rotations
-4. Unified FOV normalization (both in-plane and through-plane)
-5. Cache-time foreground validation (strict rejection of invalid samples)
+Evaluation pipelines use CropForegroundSwapSliceDimsV2 to crop foreground and
+place the slice axis last. Other transforms provide physical-field-of-view
+sampling, foreground validation, and anisotropy-aware augmentation.
 
-Architecture:
-- ForegroundValidationAndBBox: Cache-time validation + bbox computation
-- RandPhysicalCropd: Unconstrained random sampling with physical-scale crop
-- Result: Diverse spatial views for DINO multi-crop learning
-
-Literature references:
-- nnU-Net (Isensee et al., Nature Methods 2021): Foreground-guided sampling
-- MONAI CropForeground: Intensity-based foreground detection  
-- Self-Training (Zoph et al., NeurIPS 2020): Rejection sampling for quality control
-
-Author: Med3DINO team
+Author: Maregu A.
 License: CC BY-NC-ND 4.0
 """
 
@@ -166,14 +152,10 @@ class RandPhysicalCropd(Randomizable, MapTransform):
 
 class ForegroundValidationAndBBox(MapTransform):
     """
-    Cache-time transform: validates foreground content and computes bounding box.
-    
-    NOTE: This class is kept for OFFLINE validation only.
-    It is NOT used in the runtime training pipeline.
-    Use scripts/utils/validate_manifest_foreground.py for pre-validation.
-    
-    Run this during the DETERMINISTIC (cached) phase of the pipeline.
-    Invalid samples raise InvalidSampleError -> excluded from training.
+    Validate foreground content and compute its bounding box.
+
+    This helper is separate from the evaluation pipelines. With reject_invalid
+    enabled, samples below the configured thresholds raise InvalidSampleError.
     
     Args:
         keys: Keys to validate

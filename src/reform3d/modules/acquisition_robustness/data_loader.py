@@ -16,6 +16,7 @@ import logging
 import hashlib
 import os
 from pathlib import Path
+from functools import partial
 from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
 import torch
@@ -81,6 +82,26 @@ def _to_plain_tensor(value: Any) -> torch.Tensor:
     if not torch.is_tensor(value):
         value = torch.as_tensor(value)
     return value.detach().cpu().contiguous()
+
+
+def _replace_nan_intensity(image):
+    return torch.nan_to_num(image, torch.nanmean(image).item())
+
+
+def _foreground_mask(image, threshold):
+    return image > threshold
+
+
+def _collate_acquisition_batch(batch):
+    """Stack image tensors and retain each sample's metadata."""
+    images = [item["image"].as_tensor() if hasattr(item["image"], "as_tensor")
+              else item["image"] for item in batch]
+    result = {"image": torch.stack(images), "metadata": [item["metadata"] for item in batch]}
+    if "label" in batch[0]:
+        labels = [item["label"].as_tensor() if hasattr(item["label"], "as_tensor")
+                  else item["label"] for item in batch]
+        result["label"] = torch.stack(labels)
+    return result
 
 
 class AcquisitionRobustnessDataset(Dataset):
@@ -246,7 +267,7 @@ class AcquisitionRobustnessDataset(Dataset):
                 tmp_path.unlink(missing_ok=True)
 
     def _build_default_transform(self) -> Compose:
-        """Build deterministic preprocessing aligned with the verified training pipeline."""
+        """Build deterministic intensity, foreground, and orientation preprocessing."""
         keys = ["image"]
         if self.include_labels:
             keys.append("label")
@@ -255,7 +276,7 @@ class AcquisitionRobustnessDataset(Dataset):
             LoadImaged(keys=keys, ensure_channel_first=True, meta_keys=["image_meta_dict"]),
             Lambdad(
                 keys=["image"],
-                func=lambda x: torch.nan_to_num(x, torch.nanmean(x).item()),
+                func=_replace_nan_intensity,
             ),
             ScaleIntensityRangePercentilesd(
                 keys=["image"],
@@ -271,7 +292,7 @@ class AcquisitionRobustnessDataset(Dataset):
         if PREPROCESSING_CONFIG.crop_foreground:
             transforms.append(
                 CropForegroundSwapSliceDimsV2(
-                    select_fn=lambda x: x > PREPROCESSING_CONFIG.foreground_threshold,
+                    select_fn=partial(_foreground_mask, threshold=PREPROCESSING_CONFIG.foreground_threshold),
                 )
             )
 
@@ -421,37 +442,6 @@ def create_acquisition_dataloader(
         **kwargs
     )
 
-    def collate_fn(batch):
-        """Custom collate function to handle metadata.
-
-        Ensures MetaTensor objects are converted to plain tensors.
-        """
-        # Stack images, converting MetaTensors to plain tensors
-        images_list = []
-        for b in batch:
-            img = b["image"]
-            # Convert MetaTensor to plain tensor if needed
-            if hasattr(img, 'as_tensor'):
-                img = img.as_tensor()
-            images_list.append(img)
-        images = torch.stack(images_list)
-
-        metadata = [b["metadata"] for b in batch]
-
-        output = {"image": images, "metadata": metadata}
-
-        if "label" in batch[0]:
-            labels_list = []
-            for b in batch:
-                lbl = b["label"]
-                if hasattr(lbl, 'as_tensor'):
-                    lbl = lbl.as_tensor()
-                labels_list.append(lbl)
-            labels = torch.stack(labels_list)
-            output["label"] = labels
-
-        return output
-
     if pin_memory is None:
         # Feature extraction is input-pipeline bound and large 3D batches can exhaust pinned host memory.
         pin_memory = False
@@ -471,7 +461,8 @@ def create_acquisition_dataloader(
         batch_size=batch_size,
         num_workers=num_workers,
         shuffle=shuffle,
-        collate_fn=collate_fn,
+        collate_fn=_collate_acquisition_batch,
+        multiprocessing_context="spawn" if num_workers > 0 else None,
         pin_memory=pin_memory,
         persistent_workers=num_workers > 0 and persistent_workers,
         prefetch_factor=prefetch_factor,

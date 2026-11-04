@@ -13,7 +13,7 @@ expensive CPU-side preprocessing work. The extractor can:
 
 Without a crop cache, it loads each source case once, applies the same
 percentile normalization and spacing-aware axis permutation used by the
-validated Acquisition Robustness preprocessing path, crops around the organ
+shared Acquisition Robustness preprocessing path, crops around the organ
 mask bounding box, resizes to the checkpoint crop size, and writes an NPZ bundle
 with this contract:
 
@@ -45,6 +45,7 @@ import argparse
 import hashlib
 import json
 import logging
+import multiprocessing
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor
@@ -76,7 +77,6 @@ from .config import (
     get_output_paths,
     normalize_feature_type,
 )
-from .path_resolution import normalize_totalsegmenter_ct_record
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -170,7 +170,6 @@ def _load_manifest_samples(manifest_path: Path, max_samples: int | None = None) 
     for index, raw_sample in enumerate(raw_samples):
         if not isinstance(raw_sample, dict):
             continue
-        raw_sample = normalize_totalsegmenter_ct_record(raw_sample)
         sample_id = str(raw_sample.get("sample_id") or raw_sample.get("id") or f"sample_{index:06d}")
         file_path = Path(raw_sample.get("file_path") or "").resolve()
         mask_path = Path(raw_sample.get("mask_path") or "").resolve()
@@ -516,8 +515,10 @@ def _crop_cache_matches_request(
     expected_sample_count = len(samples)
     if int(index_payload.get("n_requested_samples", -1)) != expected_sample_count:
         return False, "n_requested_samples"
-    if expected_sample_count > 0 and int(index_payload.get("n_cached_samples", 0)) <= 0:
+    if int(index_payload.get("n_cached_samples", 0)) != expected_sample_count:
         return False, "n_cached_samples"
+    if int(index_payload.get("n_failed_samples", 0)) != 0:
+        return False, "n_failed_samples"
 
     expected_signature = _sample_signature(samples)
     cached_signature = index_payload.get("sample_signature")
@@ -658,7 +659,15 @@ def _build_case_crop_cache(task: Tuple[Tuple[str, str], List[OrganSample], int, 
     }
     if cache_path.exists() and not overwrite:
         cached_payload = torch.load(cache_path, map_location="cpu")
-        if cached_payload.get("cache_identity") == identity:
+        cached_ids = cached_payload.get("sample_ids", [])
+        cached_crops = cached_payload.get("crops")
+        complete = (
+            len(cached_ids) == requested_samples
+            and set(cached_ids) == {sample.sample_id for sample in case_samples}
+            and isinstance(cached_crops, torch.Tensor)
+            and tuple(cached_crops.shape) == (requested_samples, 1, crop_size, crop_size, crop_size)
+        )
+        if cached_payload.get("cache_identity") == identity and complete:
             return {
                 "source_case_id": source_case_id,
                 "n_requested_samples": requested_samples,
@@ -707,12 +716,23 @@ def _build_case_crop_cache(task: Tuple[Tuple[str, str], List[OrganSample], int, 
     }
 
 
+def _initialize_crop_worker() -> None:
+    # Spawn avoids inherited Torch locks; one CPU thread per worker avoids oversubscription.
+    torch.set_num_threads(1)
+
+
 def _wait_for_crop_cache(cache_dir: Path, timeout_seconds: int = 7200, poll_seconds: int = 5) -> Path:
     index_path = _crop_cache_index_path(cache_dir)
+    lock_path = _crop_cache_lock_path(cache_dir)
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
-        if index_path.exists() and not _crop_cache_lock_path(cache_dir).exists():
-            return index_path
+        if not lock_path.exists():
+            if index_path.exists():
+                return index_path
+            raise RuntimeError(f"Crop-cache builder exited without an index at {cache_dir}; rerun extraction")
+        pid = _read_crop_cache_lock_pid(lock_path)
+        if pid is not None and not _pid_is_running(pid):
+            raise RuntimeError(f"Crop-cache builder {pid} stopped at {cache_dir}; rerun extraction")
         time.sleep(poll_seconds)
     raise TimeoutError(f"Timed out waiting for crop cache index at {index_path}")
 
@@ -734,6 +754,8 @@ def ensure_crop_cache(
         for candidate_dir in candidate_dirs:
             candidate_index_path = _crop_cache_index_path(candidate_dir)
             if not candidate_index_path.exists():
+                continue
+            if _crop_cache_lock_path(candidate_dir).exists():
                 continue
             try:
                 index_payload = json.loads(candidate_index_path.read_text(encoding="utf-8"))
@@ -772,7 +794,7 @@ def ensure_crop_cache(
         os.close(lock_fd)
         lock_fd = None
     except FileExistsError:
-        if not index_path.exists() and _clear_stale_crop_cache_lock(cache_dir):
+        if _clear_stale_crop_cache_lock(cache_dir):
             lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
             os.write(lock_fd, str(os.getpid()).encode("utf-8"))
             os.close(lock_fd)
@@ -818,7 +840,11 @@ def ensure_crop_cache(
         if worker_count == 1:
             iterator = (_build_case_crop_cache(task) for task in tasks)
         else:
-            executor = ProcessPoolExecutor(max_workers=worker_count)
+            executor = ProcessPoolExecutor(
+                max_workers=worker_count,
+                mp_context=multiprocessing.get_context("spawn"),
+                initializer=_initialize_crop_worker,
+            )
             iterator = executor.map(_build_case_crop_cache, tasks)
 
         case_entries: List[Dict[str, Any]] = []
@@ -855,6 +881,7 @@ def ensure_crop_cache(
                 executor.shutdown(wait=True)
 
         summary = {
+            "status": "complete" if total_cached_samples == len(samples) and not total_failed_samples else "incomplete",
             "manifest_path": str(manifest_path),
             "crop_size": crop_size,
             "bbox_margin": bbox_margin,
@@ -871,6 +898,11 @@ def ensure_crop_cache(
             "failure_examples": failure_examples,
         }
         _write_json(index_path, summary)
+        if summary["status"] != "complete":
+            raise RuntimeError(
+                f"Incomplete crop cache: {total_cached_samples}/{len(samples)} samples cached, "
+                f"{total_failed_samples} failed. See {index_path}"
+            )
         return index_path
     finally:
         if lock_fd is not None:

@@ -12,4 +12,4 @@ The root [LICENSE](../../LICENSE) contains the Apache License 2.0 text. This dir
 | nnssl/OpenMind source checkout | CC BY-SA 4.0 | `nnssl-LICENSE.md` |
 | OpenMind checkpoint model card | `cc-by-4.0` front matter | Source-card hash in `source_notices.json` |
 
-Inline source headers remain attached to exported code. Source license files and model-weight terms are distinct records. MiM/GL-MAE source license records, several checkpoint redistribution terms, and the complete 3DINO-derived license text remain unresolved from inspected local evidence. Public distribution should not be described as fully license-cleared until these records are resolved. No model weights are redistributed in this export.
+Inline source headers remain attached to the bundled code. Source license files and model-weight terms are distinct records. MiM/GL-MAE source license records, several checkpoint redistribution terms, and the complete 3DINO-derived license text remain unresolved from inspected local evidence. Public distribution should not be described as fully license-cleared until these records are resolved. No model weights are included in this repository.

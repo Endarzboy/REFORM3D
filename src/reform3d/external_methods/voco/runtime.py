@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import logging
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,9 +30,6 @@ FEATURE_SURFACES = {
 }
 DEFAULT_CROP_SIZE = 96
 DEFAULT_IN_CHANNELS = 1
-
-
-logger = logging.getLogger(__name__)
 
 
 def ensure_import_paths(extra_paths: Iterable[Path] = ()) -> None:
@@ -306,20 +302,13 @@ def _load_voco_backbone(
     )
 
     current_state_dict = model.state_dict()
-    compatible_state_dict = {
-        key: state_dict[key]
-        if key in state_dict and tuple(state_dict[key].shape) == tuple(current_state_dict[key].shape)
-        else current_state_dict[key]
-        for key in current_state_dict
-    }
-    model.load_state_dict(compatible_state_dict, strict=True)
-
-    missing_checkpoint_keys = [key for key in current_state_dict if key not in state_dict]
-    if missing_checkpoint_keys:
-        logger.warning(
-            "VoCo checkpoint did not include %d backbone keys; using initialized defaults for those weights.",
-            len(missing_checkpoint_keys),
+    missing_keys = sorted(set(current_state_dict) - set(state_dict))
+    if missing_keys:
+        raise RuntimeError(
+            f"VoCo checkpoint is missing required backbone keys: {missing_keys}"
         )
+    # Unused checkpoint heads are excluded; every backbone tensor must match.
+    model.load_state_dict({key: state_dict[key] for key in current_state_dict}, strict=True)
 
     metadata = {
         "feature_size": feature_size,

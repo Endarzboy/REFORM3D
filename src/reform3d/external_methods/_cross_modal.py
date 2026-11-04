@@ -51,7 +51,7 @@ def resolve_cross_modal_manifest_path(
     if not resolved.exists():
         raise FileNotFoundError(
             f"Cross-Modal manifest not found: {resolved}. "
-            "Build the manifest first or launch through reform3d/scripts/run_external_methods.sh "
+            "Build the manifest first or use python -m reform3d.external_methods.run_external_methods "
             "so missing manifests are prepared before evaluation."
         )
     return resolved

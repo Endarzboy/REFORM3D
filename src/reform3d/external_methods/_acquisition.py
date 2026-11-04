@@ -147,7 +147,8 @@ def _missing_manifest_message(manifest_path: Path) -> str:
     return (
         f"Manifest not found: {manifest_path}. "
         "Build the manifest first with the matching module manifest builder, "
-        "or launch through reform3d/scripts/run_external_methods.sh so missing manifests are prepared before evaluation."
+        "or use python -m reform3d.external_methods.run_external_methods "
+        "so missing manifests are prepared before evaluation."
     )
 
 

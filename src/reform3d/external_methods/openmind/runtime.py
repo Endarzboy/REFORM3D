@@ -20,7 +20,6 @@ from reform3d.external_methods._sources import source_root, add_source_path
 
 THIS_FILE = Path(__file__).resolve()
 OPENMIND_ROOT = THIS_FILE.parent
-PROJECT_ROOT = THIS_FILE.parents[3]
 OPENMIND_SRC = source_root("openmind", OPENMIND_ROOT / "nnssl-openneuro" / "src")
 
 DEFAULT_MODEL_DIR = OPENMIND_ROOT / "PrimusM-OpenMind-VoCo"

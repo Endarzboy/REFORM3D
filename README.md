@@ -2,16 +2,14 @@
 
 **A Representation-Centric Evaluation Framework for 3D Medical Vision Foundation Models**
 
-[![Project](https://img.shields.io/badge/Project-Website-176b5b?logo=googlechrome&logoColor=white)](https://endarzboy.github.io/reform3d-website/)
-[![Paper](https://img.shields.io/badge/Paper-Link_pending-64748b?logo=googledocs&logoColor=white)](#publication)
-[![arXiv](https://img.shields.io/badge/arXiv-Link_pending-64748b?logo=arxiv&logoColor=white)](#publication)
-[![Weights](https://img.shields.io/badge/Weights-Hugging_Face_pending-64748b?logo=huggingface)](docs/encoders.md#med3dino-checkpoints)
-[![Notebooks](https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&logoColor=white)](notebooks/00_case_selection.ipynb)
-[![Pretraining](https://img.shields.io/badge/Pretraining-Forthcoming-64748b?logo=github)](#pretraining)
+[![Project](https://img.shields.io/badge/Project-Page-176b5b?logo=githubpages&logoColor=white)](https://endarzboy.github.io/reform3d-website/)
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-64748b?logo=arxiv&logoColor=white)](#publication)
+[![Weights](https://img.shields.io/badge/Weights-Hugging_Face-64748b?logo=huggingface)](docs/encoders.md#med3dino-checkpoints)
+[![Notebooks](https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&logoColor=white)](notebooks/visualize_PCA.ipynb)
 
 REFORM-3D helps researchers compare **frozen 3D medical encoders before downstream adaptation**. It evaluates how representations respond to voxel spacing, align anatomy across CT and MR, and support organ recognition from a few labeled examples.
 
-![Three complementary frozen-encoder evaluation modules](docs/assets/reform3d_arch.svg)
+![Three complementary frozen-encoder evaluation modules](docs/assets/reform3d_arch.jpg)
 
 | Module | Question | Primary metrics |
 |---|---|---|
@@ -21,7 +19,7 @@ REFORM-3D helps researchers compare **frozen 3D medical encoders before downstre
 
 The YAML workflow supports registered **Med3DINO and 3DINO** checkpoints. External encoders use dedicated adapters. The examples below use KiTS23 and MMWHS; [custom datasets](docs/data.md#custom-datasets) can be supplied through manifests. You can also [load frozen features directly](docs/encoders.md#use-frozen-features-downstream) for your own downstream pipeline.
 
-Compare these properties separately: stable embeddings alone do not establish useful anatomy, and the results do not guarantee a downstream winner. Low-shot probes fit labeled readouts while the encoder remains frozen. See the [project website](https://endarzboy.github.io/reform3d-website/#findings) for selected manuscript findings.
+Encoders remain frozen; low-shot probes learn from labeled support cases. See the [project website](https://endarzboy.github.io/reform3d-website/#findings) for selected manuscript findings.
 
 ## Installation
 
@@ -32,10 +30,10 @@ git clone https://github.com/Endarzboy/REFORM3D.git
 cd REFORM3D
 python3.11 -m venv .venv
 source .venv/bin/activate
-python -m pip install -c requirements.txt .
+python -m pip install -c requirements.txt -e .
 ```
 
-`requirements.txt` constrains dependency versions, including PyTorch and CUDA libraries. GPU evaluation requires a compatible NVIDIA driver. If you use a different PyTorch/CUDA combination, update the constraints together.
+This installs the checkout in editable mode with the versions in `requirements.txt`. GPU evaluation requires a compatible NVIDIA driver.
 
 For the bundled SAM-Med3D, MiM, and GL-MAE adapters, install `'.[external]'` instead of `.`. Other adapters may require upstream code or a separate environment; see [External encoders](docs/encoders.md#external-encoders).
 
@@ -48,9 +46,11 @@ For the bundled SAM-Med3D, MiM, and GL-MAE adapters, install `'.[external]'` ins
 | Med3DINO-SA | `med3dino_sa_96` | `B × 1 × 96³` | 306.78M | Hugging Face link pending |
 | 3DINO | `3dino` | `B × 1 × 112³` | 306.91M | Obtain upstream 3DINO weights |
 
-All four use ViT-L/16 backbones with 1,024-dimensional CLS and average-pooled patch features. ISO, REL, and SA refer to isotropic normalization, voxel-relative sampling, and spacing-aware sampling during Med3DINO pretraining. Parameter counts include positional and mask tokens and exclude pretraining projection heads. Physical field of view depends on preprocessing as well as tensor dimensions.
+All four use ViT-L/16 backbones with 1,024-dimensional CLS and average-pooled patch features. ISO, REL, and SA refer to isotropic normalization, voxel-relative sampling, and spacing-aware sampling during Med3DINO pretraining.
 
-Set local weight paths with `checkpoint_paths`, as shown below, or use the directory layout in the [checkpoint guide](docs/encoders.md#med3dino-checkpoints). Weight files must match the registered architecture. Med3DINO download links are pending; weight binaries are distributed separately from this repository.
+Counts include learned positional embeddings and mask tokens, excluding pretraining projection heads. The small 96³/112³ difference comes from the stored positional grid; resizing inputs during inference does not add parameters.
+
+Set local weights with `checkpoint_paths` or follow the [checkpoint directory layout](docs/encoders.md#med3dino-checkpoints). Med3DINO download links will be added here when published.
 
 ## Data preparation
 
@@ -77,7 +77,7 @@ mm_whs/
     └── mr_train_1001_label.nii.gz
 ```
 
-The tree illustrates naming; evaluation requires multiple annotated cases. The KiTS23 download uses per-case directories: the [data guide](docs/data.md) explains how to create this layout without resampling images or masks. MMWHS `.nii` files are also supported. Follow the providers' access and usage terms.
+The [data guide](docs/data.md) explains how to convert the KiTS23 per-case layout without resampling, use MMWHS `.nii` files, and prepare a complete evaluation cohort. The tree above illustrates file naming.
 
 ## Evaluation
 
@@ -99,7 +99,7 @@ device: cuda:0
 batch_size: 1
 ```
 
-Relative paths resolve beside the YAML file, so `workspace: ../workspace` places outputs at the repository root. The `demo` preset evaluates the selected cohort; it does not automatically reduce its size.
+Relative paths resolve beside the YAML file. The `demo` preset evaluates the full selected cohort.
 
 Validate the inputs, then run:
 
@@ -110,7 +110,9 @@ reform3d run --config configs/my-mmwhs.yaml
 
 `check` validates inputs and prepares the manifest without encoder inference. `run` extracts features, evaluates the selected modules, and writes reports. To compare both readouts, set `feature_types: [cls, avg_pool]`. For repeated evaluation, set `seeds: [42, 123, 456]`.
 
-Use a new `run_name` when configuration, inputs, weights, or software change. Compatible completed work is reused after integrity checks. See [Usage](docs/usage.md) for configuration options and reuse rules.
+Use a new `run_name` when configuration, inputs, weights, or software change. See [Usage](docs/usage.md) for configuration options and cache reuse.
+
+Evaluation plans fix case selections for each module and seed, shared by all encoders and readouts. Input checksums and deterministic execution settings are recorded with each run. See [Reproducibility](docs/reproduction.md).
 
 ## Results and reports
 
@@ -129,14 +131,10 @@ workspace/
     │   └── seeds/seed_42/<encoder>--cls/
     │       ├── cross_modal.json
     │       └── features/
-    │           ├── organ_features.npz
-    │           └── identity.json
     └── anatomical/my-mmwhs-evaluation/
 ```
 
-Features live inside each encoder's `features/` directory. Compatible runs share their storage through filesystem hard links; `cache/` contains only preprocessed inputs. Acquisition features use `controlled_embedding_bundle.npz` in the same per-encoder location. See the [full output layout](docs/usage.md).
-
-For KiTS23, open `workspace/runs/kits23/acquisition/<run_name>/report.html`. Tables compare encoders separately for CLS and average-pooled patches, with sortable module-specific metrics. Reports identify the evaluated cohort and summarize variation across evaluation seeds; these are fixed-checkpoint comparisons, not independent pretraining runs.
+For KiTS23, open `workspace/runs/kits23/acquisition/<run_name>/report.html`. Reports provide sortable encoder comparisons for each readout and summarize variation across evaluation seeds. See the [output guide](docs/usage.md) for saved features, metrics, and cohort details.
 
 Rebuild a report from saved results without running inference:
 
@@ -144,43 +142,38 @@ Rebuild a report from saved results without running inference:
 reform3d report --run-dir workspace/runs/mmwhs_ct_mr/_runs/my-mmwhs-evaluation
 ```
 
-## Visualization notebooks
+## PCA visualization
 
 Compare ISO, REL, and SA features on **CT and MR axial slices** using identical inputs for each encoder. The examples use KiTS23 CT and BraTS2023 FLAIR MR scans.
 
-| Notebook | Purpose |
-|---|---|
-| [00 · Input preview](notebooks/00_case_selection.ipynb) | Preview and save shared 96³ crops for PCA. |
-| [01 · Reference-feature similarity](notebooks/01_attention.ipynb) | Overlay patch-feature cosine similarity on uncropped CT/MR frames. |
-| [02 · PCA](notebooks/02_pca.ipynb) | Visualize spatial variation in patch features across the shared crops. |
+Use the self-contained [PCA notebook](notebooks/visualize_PCA.ipynb) to compare CT crop PCA and full-volume MR PCA. Image paths and settings are defined in its single runnable cell.
 
-Install the notebook tools and create your local configuration:
+Install the notebook tools:
 
 ```bash
-python -m pip install -c requirements.txt '.[notebooks]'
-cp notebooks/visualization_config.example.json notebooks/visualization_config.json
+python -m pip install -c requirements.txt -e '.[notebooks]'
 ```
 
-Edit the image, mask, and checkpoint paths, set reference points for your own scans, then launch `jupyter lab`. The `pca` and `similarity` sections share checkpoints but require separate output directories. Obtain scans and weights from their providers.
+Open the PCA notebook and edit its image paths, optional mask paths, checkpoint directory, and device, then run its cell. It reads the scans directly and needs no visualization configuration file. CT crops follow each case's foreground. Features are extracted directly on each cell run; no feature cache is created. Example scans are not bundled. Launch notebooks with `jupyter lab`.
 
-The similarity notebook preserves the full field of view on a shared isotropic model grid with a maximum axis of 224 voxels, then overlays cosine similarity on up to five native-resolution axial frames. Features are extracted once and reused for new reference points or slices. Ground truth supplies optional contours; these maps illustrate feature similarity, not segmentation accuracy. PCA colors are fitted independently for each encoder and are not directly comparable across encoders. The [visualization guide](docs/visualization.md) explains geometry, compute requirements, and display controls.
+Choose one to five axial slices and add optional ground-truth contours. MR selects the slice with the largest annotated ROI area, falling back to the image-foreground center. PCA shows feature variation rather than segmentation predictions. PCA colors are fitted independently per encoder. See the [visualization guide](docs/visualization.md) for preprocessing, feature extraction, and display controls.
 
 ## Documentation
 
 - [Data](docs/data.md): downloads, layouts, manifests, and custom datasets.
 - [Encoders](docs/encoders.md): checkpoint specifications and frozen-feature loading.
 - [Usage](docs/usage.md): configuration, caching, and reports.
-- [Visualization](docs/visualization.md): CT/MR reference-feature similarity and PCA notebooks.
+- [Visualization](docs/visualization.md): CT/MR PCA preprocessing, feature extraction, and display controls.
 - [Reproducibility](docs/reproduction.md): KiTS23/MMWHS evaluation protocols.
-- [Integrity](docs/audit.md): required input, cache, and output checks.
+- [Integrity checks](docs/usage.md#integrity-checks): required input, cache, and output checks.
 
 ## Publication
 
-Paper and arXiv URLs are pending. This repository provides the standalone evaluation tool; it does not promise full-paper table regeneration or exact historical numerical parity.
+Paper and arXiv links will be added here when available.
 
 ## Pretraining
 
-**Med3DINO pretraining repository: forthcoming.** Its link will be added here when published. The frozen encoder runtime is bundled in `src/reform3d/`; using REFORM-3D does not require the pretraining checkout.
+The Med3DINO pretraining repository will be linked here when released. REFORM-3D includes the frozen encoder implementation needed for evaluation and feature extraction.
 
 ## License
 

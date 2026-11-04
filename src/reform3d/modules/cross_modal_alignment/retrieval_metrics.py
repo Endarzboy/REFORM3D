@@ -12,24 +12,18 @@ Inputs:
 
 from collections import defaultdict
 from math import comb
-from typing import Any, Dict, Iterable, Sequence
+from typing import Any, Dict, Sequence
 
 import numpy as np
 from tqdm import tqdm
+
+from .sampling import eligible_samples, require_features, retrieval_selection, validate_evaluation_plan
 
 
 def _l2_normalize(features: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(features, axis=1, keepdims=True)
     norms = np.clip(norms, a_min=1e-12, a_max=None)
     return features / norms
-
-
-def _sample_records(records: Sequence[Dict[str, Any]], sample_count: int, rng: np.random.Generator) -> list[Dict[str, Any]]:
-    entries = list(records)
-    if sample_count >= len(entries):
-        return entries
-    indices = rng.choice(len(entries), size=sample_count, replace=False)
-    return [entries[index] for index in indices]
 
 
 def _balanced_top_chance(n_organs: int, samples_per_organ: int, k: int) -> float | None:
@@ -67,7 +61,7 @@ def _bootstrap_query_metric_ci(
     if bootstrap_resamples <= 0 or not query_results:
         return {}
 
-    rng = np.random.default_rng(int(seed))
+    rng = np.random.Generator(np.random.PCG64(int(seed)))
     metrics_by_key = {
         key: np.asarray([float(row[key]) for row in query_results if row.get(key) is not None], dtype=np.float64)
         for key in metric_keys
@@ -101,7 +95,7 @@ def _bootstrap_bidirectional_metric_ci(
     if bootstrap_resamples <= 0 or not ct_to_mr_query_results or not mr_to_ct_query_results:
         return {}
 
-    rng = np.random.default_rng(int(seed))
+    rng = np.random.Generator(np.random.PCG64(int(seed)))
     ci_payload: Dict[str, Any] = {}
     for key in metric_keys:
         ct_values = np.asarray(
@@ -145,72 +139,33 @@ def compute_cross_modal_retrieval(
     seed: int = 42,
     return_query_results: bool = False,
     bootstrap_resamples: int = 0,
+    evaluation_plan: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    supported_organ_set = set(supported_organs or [])
-    query_records = [
-        sample for sample in samples
-        if sample.get("modality") == query_modality
-        and sample.get("primary_organ")
-        and sample.get("sample_id") in features_by_id
-        and (not supported_organ_set or sample.get("primary_organ") in supported_organ_set)
-    ]
-    target_records = [
-        sample for sample in samples
-        if sample.get("modality") == target_modality
-        and sample.get("primary_organ")
-        and sample.get("sample_id") in features_by_id
-        and (not supported_organ_set or sample.get("primary_organ") in supported_organ_set)
-    ]
-
-    if not query_records or not target_records:
-        return {
-            "status": "skipped",
-            "reason": "insufficient_primary_organ_records_for_retrieval",
-            "n_queries": len(query_records),
-            "n_targets": len(target_records),
-        }
-
-    query_by_organ = defaultdict(list)
-    target_by_organ = defaultdict(list)
-    for sample in query_records:
-        query_by_organ[sample["primary_organ"]].append(sample)
-    for sample in target_records:
-        target_by_organ[sample["primary_organ"]].append(sample)
-
-    common_organs = sorted(set(query_by_organ) & set(target_by_organ))
-    if len(common_organs) < 2:
-        return {
-            "status": "skipped",
-            "reason": "need_at_least_two_organs_for_balanced_retrieval",
-            "n_queries": len(query_records),
-            "n_targets": len(target_records),
-            "n_common_organs": len(common_organs),
-        }
-
-    queries_per_organ = min(len(query_by_organ[organ]) for organ in common_organs)
-    targets_per_organ = min(len(target_by_organ[organ]) for organ in common_organs)
-    if max_queries_per_organ is not None:
-        queries_per_organ = min(queries_per_organ, max_queries_per_organ)
-    if max_targets_per_organ is not None:
-        targets_per_organ = min(targets_per_organ, max_targets_per_organ)
-    if queries_per_organ <= 0 or targets_per_organ <= 0:
-        return {
-            "status": "skipped",
-            "reason": "balanced_candidate_pool_could_not_be_formed",
-            "n_common_organs": len(common_organs),
-        }
-
-    rng = np.random.default_rng(seed)
-    balanced_queries = [
-        query
-        for organ in common_organs
-        for query in _sample_records(query_by_organ[organ], queries_per_organ, rng)
-    ]
-    balanced_targets = [
-        target
-        for organ in common_organs
-        for target in _sample_records(target_by_organ[organ], targets_per_organ, rng)
-    ]
+    top_ks = tuple(sorted(set(int(k) for k in top_ks if int(k) > 0)))
+    direction = f"{query_modality}_to_{target_modality}"
+    if evaluation_plan is not None:
+        plan_seed = seed - 1 if direction == "mr_to_ct" else seed
+        validate_evaluation_plan(evaluation_plan, samples, seed=plan_seed, supported_organs=supported_organs,
+                                 max_queries_per_organ=max_queries_per_organ,
+                                 max_targets_per_organ=max_targets_per_organ,
+                                 bootstrap_resamples=bootstrap_resamples, top_ks=top_ks)
+        if direction not in evaluation_plan["retrieval"]:
+            raise ValueError(f"Evaluation plan does not contain direction {direction}")
+        supported_organs = evaluation_plan["supported_organs"]
+    records = eligible_samples(samples, supported_organs)
+    require_features(features_by_id, [row for row in records if row["modality"] in (query_modality, target_modality)])
+    selection = (evaluation_plan["retrieval"][direction] if evaluation_plan is not None else
+                 retrieval_selection(records, query_modality, target_modality,
+                                     max_queries_per_organ, max_targets_per_organ, seed))
+    common_organs = selection["organs"]
+    queries_per_organ, targets_per_organ = selection["queries_per_organ"], selection["targets_per_organ"]
+    if len(common_organs) < 2 or queries_per_organ < 1 or targets_per_organ < 1:
+        return {"status": "skipped", "reason": "need_at_least_two_organs_for_balanced_retrieval",
+                "n_queries": len(selection["query_ids"]), "n_targets": len(selection["target_ids"]),
+                "n_common_organs": len(common_organs)}
+    by_id = {row["sample_id"]: row for row in records}
+    balanced_queries = [by_id[sid] for sid in selection["query_ids"]]
+    balanced_targets = [by_id[sid] for sid in selection["target_ids"]]
 
     query_features = _l2_normalize(np.stack([features_by_id[sample["sample_id"]] for sample in balanced_queries], axis=0))
     target_features = _l2_normalize(np.stack([features_by_id[sample["sample_id"]] for sample in balanced_targets], axis=0))
@@ -221,6 +176,7 @@ def compute_cross_modal_retrieval(
     per_organ = defaultdict(lambda: {_top_metric_key(k): 0 for k in top_ks} | {"map_total": 0.0, "n_queries": 0})
 
     target_organs = np.asarray([sample["primary_organ"] for sample in balanced_targets], dtype=object)
+    target_ids = np.asarray([record["sample_id"] for record in balanced_targets])
     average_precision_total = 0.0
     query_results: list[Dict[str, Any]] = []
     retrieval_iterator = tqdm(
@@ -232,7 +188,7 @@ def compute_cross_modal_retrieval(
     )
     for query_index, query_record in enumerate(retrieval_iterator):
         organ = query_record["primary_organ"]
-        ranking = np.argsort(-similarity[query_index])
+        ranking = np.lexsort((target_ids, -similarity[query_index]))
         per_organ[organ]["n_queries"] += 1
         ranked_organs = target_organs[ranking]
         relevance = ranked_organs == organ
@@ -294,7 +250,7 @@ def compute_cross_modal_retrieval(
             query_results,
             metric_keys=metric_keys,
             bootstrap_resamples=int(bootstrap_resamples),
-            seed=int(seed),
+            seed=(evaluation_plan["bootstrap"][f"{direction}_seed"] if evaluation_plan is not None else int(seed)),
         )
     if return_query_results:
         result["query_results"] = query_results
@@ -311,6 +267,7 @@ def compute_bidirectional_cross_modal_retrieval(
     seed: int = 42,
     return_query_results: bool = False,
     bootstrap_resamples: int = 0,
+    evaluation_plan: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     include_query_results = bool(return_query_results or bootstrap_resamples > 0)
     ct_to_mr = compute_cross_modal_retrieval(
@@ -325,6 +282,7 @@ def compute_bidirectional_cross_modal_retrieval(
         seed=seed,
         return_query_results=include_query_results,
         bootstrap_resamples=bootstrap_resamples,
+        evaluation_plan=evaluation_plan,
     )
     mr_to_ct = compute_cross_modal_retrieval(
         features_by_id,
@@ -338,6 +296,7 @@ def compute_bidirectional_cross_modal_retrieval(
         seed=seed + 1,
         return_query_results=include_query_results,
         bootstrap_resamples=bootstrap_resamples,
+        evaluation_plan=evaluation_plan,
     )
 
     summary = None
@@ -355,7 +314,7 @@ def compute_bidirectional_cross_modal_retrieval(
             mr_to_ct.get("query_results", []),
             metric_keys=sorted(summary),
             bootstrap_resamples=int(bootstrap_resamples),
-            seed=int(seed) + 1009,
+            seed=(evaluation_plan["bootstrap"]["bidirectional_seed"] if evaluation_plan is not None else int(seed) + 1009),
         )
 
     if not return_query_results:

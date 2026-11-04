@@ -6,7 +6,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from reform3d.external_methods._primary_feature import PrimaryFeatureMethod
+from reform3d.external_methods._primary_feature import PrimaryFeatureMethod, reference_checkpoint_sha256
 from reform3d.external_methods._acquisition import (
     resolve_acquisition_manifest_path,
     run_controlled_perturbation_analysis,
@@ -36,9 +36,7 @@ def _checkpoint_sha256(
     method: PrimaryFeatureMethod,
     checkpoint_path: Path,
 ) -> str | None:
-    if checkpoint_path.expanduser().resolve() == method.checkpoint_path.expanduser().resolve():
-        return method.checkpoint_sha256
-    return None
+    return reference_checkpoint_sha256(checkpoint_path, method.checkpoint_path, method.checkpoint_sha256)
 
 
 def run_controlled_cli(method: PrimaryFeatureMethod) -> None:

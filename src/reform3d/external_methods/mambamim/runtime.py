@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Dict
@@ -10,7 +9,7 @@ from typing import Dict
 import torch
 
 from reform3d.core.paths import resolve_external_method_checkpoint_path
-from reform3d.external_methods._primary_feature import PrimaryFeatureMethod
+from reform3d.external_methods._primary_feature import PrimaryFeatureMethod, reference_checkpoint_sha256
 from reform3d.external_methods._sources import source_root, add_source_path
 
 
@@ -19,7 +18,6 @@ REGISTERED_CHECKPOINT_PATH = resolve_external_method_checkpoint_path(
     "mambamim",
     "mambamim_mask75.pth",
 )
-LOCAL_CHECKPOINT_PATH = MAMBAMIM_SOURCE_ROOT / "checkpoint" / "mambamim_mask75.pth"
 DEFAULT_CHECKPOINT_PATH = REGISTERED_CHECKPOINT_PATH
 DEFAULT_CHECKPOINT_NAME = "mambamim_mask75"
 DEFAULT_MODEL_NAME = "MambaMIM"
@@ -115,7 +113,9 @@ class MambaMIMFeatureExtractor:
             input_size=DEFAULT_CROP_SIZE,
             checkpoint_path=str(checkpoint_path),
             source_commit=SOURCE_COMMIT,
-            checkpoint_sha256=CHECKPOINT_SHA256,
+            checkpoint_sha256=reference_checkpoint_sha256(
+                checkpoint_path, DEFAULT_CHECKPOINT_PATH, CHECKPOINT_SHA256,
+            ),
         )
 
     @torch.inference_mode()

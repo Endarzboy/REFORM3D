@@ -16,11 +16,29 @@ Start from an example YAML. Paths are absolute or relative to that YAML; environ
 
 `demo` and `screening` use the selected cohort. `paper` defaults to seeds 42/123/456 for that surface; it does not run every paper dataset or extension. The acquisition module evaluates matched-case controlled spacing. Optional native-spacing, uncertainty, and support-size analyses have dedicated module entry points; they are separate from the three-module YAML workflow.
 
-`check` validates inputs and writes the resolved manifest without inference. `run --dry-run` does the same. A normal run verifies SHA-256 receipts before reusing completed features and metrics. Changed configuration, weights, data fingerprint, or software requires a new `run_name`.
+`check` validates input contents and geometry, writes the resolved manifest, and prepares evaluation plans without encoder inference. Acquisition preparation also reads semantic annotations. `run --dry-run` does the same. A normal run verifies plans and SHA-256 receipts before reusing completed features and metrics. Changed configuration, weights, input contents, or software requires a new `run_name`.
+
+Each `<module>-seed<N>-<hash>.plan.json` under `manifests/<dataset>/` contains the selections consumed by every encoder/readout for that module and seed. Plans are generated automatically; no extra YAML files are needed. `run.json` records their paths and hashes, deterministic execution settings, and an `evaluation_hash` for comparing the scientific setup across output locations. Plan hashes alone identify selections, not the input data or numerical environment.
 
 Artifacts are grouped by dataset and module; `run_name` keeps experiments separate. All encoder features live in `seeds/seed_<N>/<checkpoint>--<feature>/features/`, alongside their identity metadata. Acquisition uses one `controlled_embedding_bundle.npz` for both evaluation reuse and analysis; organ modules use `organ_features.npz`. The `cache/<dataset>/` directory holds preprocessed inputs only. Compatible runs, seeds and organ modules reuse sealed features through filesystem hard links: each encoder folder contains an ordinary file, without a second copy of the arrays. Reuse verifies the checkpoint, input geometry, readout, software and execution settings. Do not edit generated artifacts in place.
 
 Incomplete extraction, missing required metrics, incompatible weights, and invalid geometry fail the run. Concurrent writes to the same run or shared artifacts are rejected. Inspect `run.json` and `logs/`; the report identifies incomplete results. Requested unsupported modules fail explicitly.
+
+## Integrity checks
+
+The workflow checks inputs and saved outputs before evaluation or reuse.
+
+| Check | Required behavior |
+|---|---|
+| Inputs | Reject missing files, duplicate identities, unreadable annotations, and inconsistent spacing or image/mask geometry |
+| Checkpoints | Require complete backbone weights with compatible shapes |
+| Features | Reject missing, duplicate, nonfinite, or incompatible embeddings |
+| Reuse | Match input, protocol, checkpoint, software, and numerical settings |
+| Completed runs | Verify feature and metric checksums before reuse; preserve results during validation |
+
+If a check fails, inspect the error and run logs before changing inputs. Use a new `run_name` for a changed evaluation; do not edit a completed run's receipt or artifacts to bypass a mismatch.
+
+## Reports and saved outputs
 
 Open `report.html` locally. It compares encoders separately for CLS and average-pooled patches. Multilayer tables remain in the HTML but are hidden from the page; their values are included in CSV and JSON. Sort a table by the metric relevant to your use: semantic-transfer balanced accuracy or CKA (higher), or representation drift (lower). Values show means and sample SD across evaluation seeds. Missing evaluations are identified and excluded from ranking claims. CSV and JSON retain full numeric precision.
 
@@ -28,7 +46,7 @@ The acquisition report states the source cohort, spacing variants, and eligible 
 
 ```text
 workspace/
-  manifests/<dataset>/          # validated inputs, fingerprints, scan metadata
+  manifests/<dataset>/          # validated inputs, content checksums, evaluation plans
   cache/<dataset>/
     acquisition/<identity>/     # controlled-spacing geometry
     organs/<identity>/          # shared organ crops

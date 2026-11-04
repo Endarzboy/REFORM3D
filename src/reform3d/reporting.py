@@ -12,7 +12,6 @@ from pathlib import Path
 from .settings import write_json
 
 
-# Metric order also defines the initial sort within each feature readout.
 METRICS = {
     'acquisition': {
         'transfer': ('Semantic transfer', True, True,
@@ -34,6 +33,13 @@ METRICS = {
         'centroid_ba': ('Centroid baseline', True, True, 'Nearest-centroid balanced accuracy under the same evaluation protocol.'),
         'adaptation_gain': ('Adaptation gain', True, True, 'Balanced-accuracy gain over the nearest-centroid baseline, in percentage points.'),
     },
+}
+# Main-table metrics in display order; the first sets the initial sort.
+# Structured exports retain all measurements.
+TABLE_METRICS = {
+    'acquisition': ('transfer', 'cka', 'drift'),
+    'cross_modal': ('map', 'top@1', 'top@5'),
+    'anatomical': ('probe_ba', 'centroid_ba', 'adaptation_gain'),
 }
 MODULE_NAMES = {'acquisition': 'Acquisition robustness', 'cross_modal': 'Cross-modal alignment',
                 'anatomical': 'Anatomical generalization'}
@@ -178,7 +184,7 @@ def _metric_cell(row, specification):
 
 
 def _panel(module, feature, checkpoints, summary, coverage, evidence, allow_rank):
-    specs = METRICS[module]
+    specs = {name: METRICS[module][name] for name in TABLE_METRICS[module]}
     primary = next(iter(specs))
     selected = {(row['checkpoint'], row['metric']): row for row in summary
                 if row['module'] == module and row['feature'] == feature}
@@ -319,7 +325,8 @@ def write_report(run_dir, cfg, rows, status='complete'):
         secondary = [feature for feature in cfg['feature_types'] if feature not in primary]
         for feature in primary + secondary:
             parts.append(_panel(module, feature, checkpoints, summary, coverage, evidence, complete))
-        definitions = ''.join(f'<div><dt>{_esc(spec[0])} {"↑" if spec[1] else "↓"}</dt><dd>{_esc(spec[3])}</dd></div>' for spec in METRICS[module].values())
+        definitions = ''.join(f'<div><dt>{_esc(spec[0])} {"↑" if spec[1] else "↓"}</dt><dd>{_esc(spec[3])}</dd></div>'
+                              for spec in (METRICS[module][name] for name in TABLE_METRICS[module]))
         parts.append(f'<div class="metric-guide"><h3>How to read these metrics</h3><dl class="definitions">{definitions}</dl>')
         if module == 'acquisition':
             parts.append('<p class="note">Compare semantic transfer alongside CKA and drift: stable features alone do not imply useful information. '

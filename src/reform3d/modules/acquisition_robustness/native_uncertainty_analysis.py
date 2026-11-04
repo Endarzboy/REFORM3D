@@ -4,7 +4,7 @@
 This helper consumes cached observational feature bundles and existing
 native-spacing result artifacts. It does not rerun feature extraction. It
 reports stratified-bin bootstrap confidence intervals for the compact
-native-spacing acquisition metrics currently shown in the benchmark tables:
+native-spacing acquisition metrics:
 
 - observational CKA: ``representation_geometry.json -> cka_stats.mean_cross_cka``
 - observational semantic transfer: ``semantic_transfer.json -> cross_bin_accuracy``
@@ -29,6 +29,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import csv
 from functools import lru_cache
@@ -752,7 +753,7 @@ def _analyze_metric_paths(
         (path, int(bootstrap_resamples), int(seed), cka_method, int(semantic_min_class_count))
         for path in metric_paths
     ]
-    with ProcessPoolExecutor(max_workers=workers) as executor:
+    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn")) as executor:
         futures = {
             executor.submit(_analyze_metric_path_task, task): index
             for index, task in enumerate(tasks)

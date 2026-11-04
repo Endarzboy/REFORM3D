@@ -1,22 +1,21 @@
 """Fixed-budget few-shot transfer analysis for Anatomical Generalization.
 
-This module implements the Surface B evaluation layer: for each low-shot target
-organ, it samples a balanced, case-disjoint support/query split across organs and
+For each low-shot target organ, the evaluator samples a balanced, case-disjoint
+support/query split across organs and
 modalities, trains a lightweight linear probe, and measures how well the target
 organ is recognized on query examples whose source cases were not used for
 adaptation.
 
 The protocol is intentionally simple and deterministic:
 
-    1. keep only samples with valid features and supported organs
+    1. validate complete features for the supported organs
     2. sample a fixed support budget per organ and modality
     3. build a balanced query pool from the remaining records
     4. train one multiclass linear probe on the support pool
     5. report target-organ query accuracy, in-distribution reference accuracy,
        generalization gap, and transfer efficiency
 
-This gives Anatomical Generalization a task-facing transfer surface without introducing a new
-segmentation trainer inside the package.
+The probe operates on frozen embeddings; encoder weights are unchanged.
 """
 
 from __future__ import annotations
@@ -29,6 +28,8 @@ from tqdm import tqdm
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from sklearn.preprocessing import StandardScaler
+
+from reform3d.core.reproducibility import canonical_records, plan_hash
 
 from .feature_projection import (
     FeatureProjectionSettings,
@@ -60,13 +61,25 @@ def _eligible_records(
 ) -> list[Dict[str, Any]]:
     supported = set(supported_organs)
     required = set(required_modalities)
-    return [
+    records = [
         sample
-        for sample in samples
-        if sample.get("sample_id") in features_by_id
-        and sample.get("primary_organ") in supported
+        for sample in canonical_records(samples, kind="samples")
+        if sample.get("primary_organ") in supported
         and sample.get("modality") in required
     ]
+    missing = [sample["sample_id"] for sample in records if sample["sample_id"] not in features_by_id]
+    if missing:
+        raise ValueError(f"Anatomical features are missing sample IDs: {missing}")
+    dimensions = set()
+    for sample in records:
+        feature = np.asarray(features_by_id[sample["sample_id"]])
+        if (feature.ndim != 1 or not feature.size or not np.issubdtype(feature.dtype, np.number)
+                or np.iscomplexobj(feature) or not np.isfinite(feature).all()):
+            raise ValueError(f"Invalid anatomical feature for {sample['sample_id']}")
+        dimensions.add(feature.size)
+    if len(dimensions) > 1:
+        raise ValueError("Anatomical feature dimensions differ across samples")
+    return records
 
 
 def _group_by_organ_and_modality(
@@ -105,7 +118,7 @@ def _sample_case_representatives(
 
     selected_records = []
     for case_id in selected_case_ids:
-        case_records = grouped_by_case[case_id]
+        case_records = sorted(grouped_by_case[case_id], key=lambda record: str(record["sample_id"]))
         selected_records.append(case_records[int(rng.integers(len(case_records)))])
     return selected_records, set(selected_case_ids)
 
@@ -118,6 +131,8 @@ def _build_case_disjoint_support_and_query_sets(
     query_per_modality: int | None,
     rng: np.random.Generator,
 ) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]], int] | tuple[None, None, None]:
+    supported_organs = sorted(supported_organs)
+    required_modalities = sorted(required_modalities)
     support_records: list[Dict[str, Any]] = []
     support_case_ids: set[str] = set()
     for modality in required_modalities:
@@ -191,6 +206,134 @@ def _build_case_disjoint_support_and_query_sets(
             query_records.extend(query_subset)
 
     return support_records, query_records, balanced_query_count
+
+
+def _plan_inputs(samples, required_modalities, supported_organs,
+                 min_samples_per_modality, support_per_modality, query_per_modality):
+    from .data_loader import get_eligible_holdout_organs
+
+    records = canonical_records(samples, kind="samples")
+    if any(not (record.get("source_case_id") or record.get("patient_id")) for record in records):
+        raise ValueError("Anatomical plans require explicit source_case_id or patient_id for every sample")
+    modalities = sorted(set(required_modalities))
+    if not modalities or any(not isinstance(value, str) or not value for value in modalities):
+        raise ValueError("Anatomical evaluation requires named modalities")
+    budgets = [min_samples_per_modality, support_per_modality]
+    if query_per_modality is not None:
+        budgets.append(query_per_modality)
+    if any(isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1
+           for value in budgets):
+        raise ValueError("Anatomical support, query and eligibility budgets must be positive integers")
+    eligible = get_eligible_holdout_organs(records, modalities, min_samples_per_modality)
+    organs = sorted(set(supported_organs)) if supported_organs is not None else eligible
+    if len(organs) < 2 or not set(organs).issubset(eligible):
+        raise ValueError("Anatomical evaluation requires at least two eligible organs")
+    cohort = [{
+        "sample_id": record["sample_id"],
+        "case_id": _case_id(record),
+        "patient_id": record.get("patient_id"),
+        "organ": record.get("primary_organ"),
+        "modality": record.get("modality"),
+    } for record in records]
+    protocol = {
+        "split_policy": "case_disjoint_support_query",
+        "case_identity": "source_case_id_or_patient_id",
+        "required_modalities": modalities,
+        "supported_organs": organs,
+        "min_samples_per_modality": int(min_samples_per_modality),
+        "support_per_modality": int(support_per_modality),
+        "query_per_modality": int(query_per_modality) if query_per_modality is not None else None,
+    }
+    return records, cohort, protocol
+
+
+def build_evaluation_plan(
+    samples: Sequence[Dict[str, Any]], *, seed: int,
+    required_modalities: Sequence[str] = ("ct", "mr"),
+    min_samples_per_modality: int = 5,
+    support_per_modality: int = 2,
+    query_per_modality: int | None = None,
+    supported_organs: Sequence[str] | None = None,
+) -> Dict[str, Any]:
+    """Choose case-disjoint support/query IDs before loading encoder features."""
+    records, cohort, protocol = _plan_inputs(
+        samples, required_modalities, supported_organs, min_samples_per_modality,
+        support_per_modality, query_per_modality,
+    )
+    if isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or not 0 <= seed <= 2**32 - 1:
+        raise ValueError("Evaluation seed must be an integer between 0 and 2**32 - 1")
+    selected = [record for record in records
+                if record.get("primary_organ") in protocol["supported_organs"]
+                and record.get("modality") in protocol["required_modalities"]]
+    support, query, query_count = _build_case_disjoint_support_and_query_sets(
+        _group_by_organ_and_modality(selected, protocol["required_modalities"]),
+        protocol["supported_organs"], protocol["required_modalities"],
+        support_per_modality, query_per_modality, np.random.default_rng(int(seed)),
+    )
+    if support is None or query is None:
+        raise ValueError("Insufficient case-disjoint support/query cases for the anatomical protocol")
+    return {
+        "schema_version": 1,
+        "module": "anatomical",
+        "seed": int(seed),
+        "cohort": cohort,
+        "protocol": protocol,
+        "support_sample_ids": [record["sample_id"] for record in support],
+        "query_sample_ids": [record["sample_id"] for record in query],
+        "support_case_ids": sorted({_case_id(record) for record in support}),
+        "query_case_ids": sorted({_case_id(record) for record in query}),
+        "balanced_query_per_modality": query_count,
+    }
+
+
+def _consume_evaluation_plan(plan, samples, *, seed, required_modalities, supported_organs,
+                             min_samples_per_modality, support_per_modality, query_per_modality):
+    """Validate identities and budgets, then use saved selections without resampling."""
+    records, cohort, protocol = _plan_inputs(
+        samples, required_modalities, supported_organs, min_samples_per_modality,
+        support_per_modality, query_per_modality,
+    )
+    if not isinstance(plan, dict) or plan.get("schema_version") != 1 or plan.get("module") != "anatomical":
+        raise ValueError("Unsupported anatomical evaluation plan")
+    if plan.get("seed") != seed or plan.get("protocol") != protocol:
+        raise ValueError("Anatomical evaluation plan seed or protocol does not match")
+    if plan.get("cohort") != cohort:
+        raise ValueError("Anatomical evaluation plan cohort or labels changed")
+    by_id = {record["sample_id"]: record for record in records
+             if record.get("primary_organ") in protocol["supported_organs"]
+             and record.get("modality") in protocol["required_modalities"]}
+    selected = {}
+    for role in ("support", "query"):
+        ids = plan.get(f"{role}_sample_ids")
+        if (not isinstance(ids, list) or not ids or any(not isinstance(value, str) for value in ids)
+                or len(ids) != len(set(ids)) or not set(ids).issubset(by_id)):
+            raise ValueError(f"Invalid anatomical {role} sample IDs")
+        selected[role] = [by_id[sample_id] for sample_id in ids]
+        cases = sorted({_case_id(record) for record in selected[role]})
+        if plan.get(f"{role}_case_ids") != cases:
+            raise ValueError(f"Anatomical {role} case IDs do not match sample IDs")
+    support_cases = {_case_id(record) for record in selected["support"]}
+    if support_cases.intersection(_case_id(record) for record in selected["query"]):
+        raise ValueError("Anatomical support/query cases overlap")
+    remaining = _group_by_organ_and_modality(
+        [record for record in by_id.values() if _case_id(record) not in support_cases],
+        protocol["required_modalities"],
+    )
+    query_count = min(len({_case_id(record) for record in remaining[organ][modality]})
+                      for organ in protocol["supported_organs"]
+                      for modality in protocol["required_modalities"])
+    if query_per_modality is not None:
+        query_count = min(query_count, query_per_modality)
+    if query_count < 1 or plan.get("balanced_query_per_modality") != query_count:
+        raise ValueError("Anatomical query budget does not match the available cases")
+    for role, count in (("support", support_per_modality), ("query", query_count)):
+        grouped = _group_by_organ_and_modality(selected[role], protocol["required_modalities"])
+        for organ in protocol["supported_organs"]:
+            for modality in protocol["required_modalities"]:
+                stratum = grouped[organ][modality]
+                if len(stratum) != count or len({_case_id(record) for record in stratum}) != count:
+                    raise ValueError(f"Anatomical {role} budget differs for {organ}/{modality}")
+    return selected["support"], selected["query"], query_count
 
 
 def _organ_accuracy(
@@ -314,16 +457,44 @@ def evaluate_low_shot_target_transfer(
     query_per_modality: int | None = None,
     seeds: Sequence[int] = (42, 123, 456),
     feature_projection: FeatureProjectionSettings | None = None,
+    evaluation_plan: Dict[str, Any] | None = None,
+    min_samples_per_modality: int | None = None,
 ) -> Dict[str, Any]:
-    """Run the Surface B fixed-budget low-shot target-organ transfer evaluation.
+    """Run fixed-budget low-shot target-organ transfer evaluation.
 
     Each fold names one target organ. The target organ is included in the
     support set with the same fixed budget as every other organ, and evaluation
     is performed on query examples from source cases that are disjoint from all
     support cases.
     """
-    records = _eligible_records(samples, features_by_id, supported_organs, required_modalities)
-    grouped_records = _group_by_organ_and_modality(records, required_modalities)
+    samples = canonical_records(samples, kind="samples")
+    supported_organs = sorted(set(supported_organs))
+    required_modalities = sorted(set(required_modalities))
+    seeds = list(seeds)
+    if any(isinstance(seed, bool) or not isinstance(seed, (int, np.integer)) or not 0 <= seed <= 2**32 - 1
+           for seed in seeds):
+        raise ValueError("Evaluation seeds must be integers between 0 and 2**32 - 1")
+    if not seeds or len(seeds) != len(set(seeds)):
+        raise ValueError("Anatomical evaluation seeds must be nonempty and unique")
+    _eligible_records(samples, features_by_id, supported_organs, required_modalities)
+    if evaluation_plan is not None and len(seeds) != 1:
+        raise ValueError("One anatomical evaluation plan requires exactly one evaluation seed")
+    if evaluation_plan is not None and (not isinstance(evaluation_plan, dict)
+                                       or not isinstance(evaluation_plan.get("protocol"), dict)):
+        raise ValueError("Unsupported anatomical evaluation plan")
+    if min_samples_per_modality is None:
+        min_samples_per_modality = (evaluation_plan.get("protocol", {}).get("min_samples_per_modality", 1)
+                                   if isinstance(evaluation_plan, dict) else 1)
+    plan_options = dict(
+        required_modalities=required_modalities, supported_organs=supported_organs,
+        min_samples_per_modality=min_samples_per_modality,
+        support_per_modality=support_per_modality, query_per_modality=query_per_modality,
+    )
+    plans = {int(seed): evaluation_plan if evaluation_plan is not None else
+             build_evaluation_plan(samples, seed=seed, **plan_options) for seed in seeds}
+    selections = {int(seed): _consume_evaluation_plan(
+        plans[int(seed)], samples, seed=seed, **plan_options,
+    ) for seed in seeds}
     surface_scope = "within_modality" if len(required_modalities) == 1 else "cross_modality"
     transfer_protocol = "fixed_budget_low_shot_target_transfer_case_disjoint"
 
@@ -346,17 +517,7 @@ def evaluate_low_shot_target_transfer(
         seed_results: list[Dict[str, Any]] = []
         seed_iterator = tqdm(seeds, desc=f"Few-shot seeds {organ}", unit="seed", dynamic_ncols=True, leave=False)
         for seed in seed_iterator:
-            rng = np.random.default_rng(int(seed))
-            support_records, query_records, balanced_query_count = _build_case_disjoint_support_and_query_sets(
-                grouped_records,
-                supported_organs,
-                required_modalities,
-                support_per_modality=support_per_modality,
-                query_per_modality=query_per_modality,
-                rng=rng,
-            )
-            if support_records is None or query_records is None:
-                continue
+            support_records, query_records, balanced_query_count = selections[int(seed)]
 
             support_features = np.stack([features_by_id[record["sample_id"]] for record in support_records], axis=0)
             query_features = np.stack([features_by_id[record["sample_id"]] for record in query_records], axis=0)
@@ -484,6 +645,7 @@ def evaluate_low_shot_target_transfer(
             seed_results.append(
                 {
                     "seed": int(seed),
+                    "evaluation_plan_hash": plan_hash(plans[int(seed)]),
                     "support_per_modality": int(support_per_modality),
                     "query_per_modality": int(balanced_query_count),
                     "n_support_samples": int(len(support_records)),
@@ -748,6 +910,7 @@ def evaluate_low_shot_target_transfer(
         "support_per_modality": int(support_per_modality),
         "query_per_modality": query_per_modality,
         "evaluation_seeds": [int(seed) for seed in seeds],
+        "evaluation_plan_hashes": {str(seed): plan_hash(plan) for seed, plan in plans.items()},
         "n_supported_organs": len(list(supported_organs)),
         "n_evaluated_organs": len(evaluated_organs),
         "feature_projection": feature_projection.to_payload()

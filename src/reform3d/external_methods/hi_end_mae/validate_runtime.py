@@ -6,6 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
+from reform3d.external_methods._primary_feature import reference_checkpoint_sha256
+
 from reform3d.external_methods.hi_end_mae.runtime import (
     CHECKPOINT_SHA256,
     DEFAULT_CHECKPOINT_PATH,
@@ -29,7 +31,9 @@ def main() -> None:
         json.dumps(
             {
                 "checkpoint_path": str(Path(args.checkpoint_path).resolve()),
-                "checkpoint_sha256": CHECKPOINT_SHA256,
+                "checkpoint_sha256": reference_checkpoint_sha256(
+                    args.checkpoint_path, DEFAULT_CHECKPOINT_PATH, CHECKPOINT_SHA256,
+                ),
                 "source_commit": SOURCE_COMMIT,
                 "crop_size": DEFAULT_CROP_SIZE,
                 "feature_type": "cls",

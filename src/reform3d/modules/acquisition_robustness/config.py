@@ -114,7 +114,6 @@ def get_cache_root(
 # RAW DATASET REGISTRY
 # =============================================================================
 # These datasets are used for representation geometry and controlled perturbation analyses.
-# Status: VERIFIED paths from local exploration.
 
 @dataclass
 class RawDatasetConfig:
@@ -152,7 +151,7 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         label_path=RAW_DATA_ROOT / "ct_pet" / "autoPET_v1.1" / "lbl",
         file_pattern="*.nii.gz",
         notes="~2,597 volumes, near-isotropic (0.49-1.47)",
-        is_validated=True,  # Cleaned 2024-03: 1 corrupted file removed
+        is_validated=True,
         is_enabled=False,
     ),
     "hecktor25": RawDatasetConfig(
@@ -162,7 +161,7 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         has_labels=True,
         file_pattern="*.nii.gz",
         notes="PET/CT for head-neck cancer",
-        is_validated=True,  # Cleaned 2024-03: 2 corrupted files removed
+        is_validated=True,
         is_enabled=False,
     ),
 
@@ -175,7 +174,7 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         label_path=None,  # Labels found via filename replacement (.img -> .label)
         file_pattern="*.img.nii.gz",  # Only match image files, not labels
         notes="~1,000 volumes, mild anisotropy (1.08-1.73)",
-        is_validated=True  # Cleaned 2024-03: no corrupted files found
+        is_validated=True
     ),
 
     # Abdominal CT
@@ -187,7 +186,7 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         label_path=None,  # Labels are co-located with images (combined_labels.nii.gz)
         file_pattern="ct.nii.gz",  # Each subject has ct.nii.gz
         notes="AbdomenAtlas 1.1 Mini: ~9262 volumes, comprehensive abdominal CT with multi-organ segmentation",
-        is_validated=True  # Cleaned 2024-03: no corrupted files found
+        is_validated=True
     ),
     "kits23": RawDatasetConfig(
         name="kits23",
@@ -228,7 +227,6 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
 # DOWNSTREAM DATASET REGISTRY
 # =============================================================================
 # These datasets have labels and can support spacing-stratified readout analysis.
-# Status: VERIFIED paths from local exploration.
 
 @dataclass
 class DownstreamDatasetConfig:
@@ -547,10 +545,7 @@ SAMPLING_CONFIG = SamplingConfig()
 # =============================================================================
 # ANALYSIS PRESET CONFIGURATION
 # =============================================================================
-# The Acquisition Robustness workflow is dataset-scoped. Modality-filter presets
-# are intentionally not exposed here because they mixed experimental naming with
-# manifest construction. Use explicit dataset manifests instead, e.g. AbdomenAtlas
-# for the acquisition-robustness reproduction target.
+# Use explicit dataset manifests for acquisition evaluation.
 
 @dataclass
 class AnalysisConfig:
@@ -810,7 +805,7 @@ class ControlledPerturbationConfig:
     orientation_policy: str = "spacing_permutation"
 
     # Optional fixed physical field-of-view crop after resampling, before
-    # resizing back to checkpoint input size. None preserves the legacy center
+    # resizing back to checkpoint input size. None uses the default center
     # crop/resample/resize pipeline.
     physical_fov_mm: Optional[Tuple[float, float, float]] = None
 
@@ -950,7 +945,7 @@ CROSS_BIN_TRANSFER_CONFIG = CrossBinTransferConfig()
 class PreprocessingConfig:
     """Configuration for data preprocessing."""
     # Intensity normalization (percentile-based)
-    # Match the verified Med3DINO training pipeline in train3d.py.
+    # Percentile intensity scaling and foreground cropping.
     intensity_percentile_lower: float = 0.05
     intensity_percentile_upper: float = 99.95
     intensity_output_min: float = -1.0
