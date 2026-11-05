@@ -20,8 +20,10 @@
       "checkpoint_file": "med3dino_rel/c96_rel_teacher_checkpoint.pth",
       "bytes": 1416593782,
       "sha256": "ec3d925077b5cea459169f5e67d6da7faa7f6796224afd5a2fe6a88d978ef60a",
-      "download_url": null,
-      "license": "unresolved_checkpoint_redistribution_terms"
+      "repository_url": "https://huggingface.co/maregu2023/Med3DINO/tree/main",
+      "download_url": "https://huggingface.co/maregu2023/Med3DINO/resolve/3404b24c7fb060215c15998aec6de42c7d6febc1/med3dino_rel/c96_rel_teacher_checkpoint.pth",
+      "license": "cc-by-nc-4.0",
+      "revision": "3404b24c7fb060215c15998aec6de42c7d6febc1"
     },
     {
       "checkpoint_key": "med3dino_iso_96",
@@ -40,8 +42,10 @@
       "checkpoint_file": "med3dino_iso/c96_iso_teacher_checkpoint.pth",
       "bytes": 1416593782,
       "sha256": "13af8d7f0157985aaf4da5b884bbdbc49f8e5e5a51eabd6d20e28c382753b74b",
-      "download_url": null,
-      "license": "unresolved_checkpoint_redistribution_terms"
+      "repository_url": "https://huggingface.co/maregu2023/Med3DINO/tree/main",
+      "download_url": "https://huggingface.co/maregu2023/Med3DINO/resolve/3404b24c7fb060215c15998aec6de42c7d6febc1/med3dino_iso/c96_iso_teacher_checkpoint.pth",
+      "license": "cc-by-nc-4.0",
+      "revision": "3404b24c7fb060215c15998aec6de42c7d6febc1"
     },
     {
       "checkpoint_key": "med3dino_sa_96",
@@ -60,24 +64,10 @@
       "checkpoint_file": "med3dino_sa/c96_sa_teacher_checkpoint.pth",
       "bytes": 1416593782,
       "sha256": "a57347561b103ac92c9647644ee5a3de9464e54b4b11f470ebf2e88eac1a6119",
-      "download_url": null,
-      "license": "unresolved_checkpoint_redistribution_terms"
-    },
-    {
-      "checkpoint_key": "3dino",
-      "release_name": "3DINO",
-      "aliases": [
-        "DINOv2-3D",
-        "3DINO"
-      ],
-      "architecture": "vit_large_3d",
-      "crop_size": 112,
-      "geometry_policy": "relative",
-      "checkpoint_file": "3dinov2/3dinov2_teacher_checkpoint.pth",
-      "bytes": 1417113974,
-      "sha256": "b68dde2e435648bdf72edae70f970b07e4a903a8122c5be9e360bdb076cf695c",
-      "download_url": null,
-      "license": "unresolved_checkpoint_redistribution_terms"
+      "repository_url": "https://huggingface.co/maregu2023/Med3DINO/tree/main",
+      "download_url": "https://huggingface.co/maregu2023/Med3DINO/resolve/3404b24c7fb060215c15998aec6de42c7d6febc1/med3dino_sa/c96_sa_teacher_checkpoint.pth",
+      "license": "cc-by-nc-4.0",
+      "revision": "3404b24c7fb060215c15998aec6de42c7d6febc1"
     }
   ]
 }

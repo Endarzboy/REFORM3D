@@ -1,15 +1,5 @@
 # Source notices
 
-The root [LICENSE](../../LICENSE) contains the Apache License 2.0 text. This directory preserves the separately recorded component and checkpoint terms, including original source headers; it does not replace those terms with a blanket license.
+See the root [LICENSE](../../LICENSE) for REFORM-3D's own code. Med3DINO checkpoint weights are offered under CC BY-NC 4.0; see the [checkpoint metadata](../checkpoints.json).
 
-| Component | Locally recorded terms | Evidence |
-| --- | --- | --- |
-| Selected DINOv2-derived layers | Apache License 2.0 in inline headers | `source_notices.json` |
-| 3D vision transformer, 3D patch embedding, training and augmentation sources | CC BY-NC-ND 4.0 in inline headers; referenced root license text was not found | `source_notices.json` |
-| Hi-End-MAE | Apache License 2.0 | `Hi-End-MAE-LICENSE.txt` |
-| SAM-Med3D | Apache License 2.0 | `SAM-Med3D-LICENSE.txt` |
-| MambaMIM | Apache License 2.0 | `MambaMIM-LICENSE.txt` |
-| nnssl/OpenMind source checkout | CC BY-SA 4.0 | `nnssl-LICENSE.md` |
-| OpenMind checkpoint model card | `cc-by-4.0` front matter | Source-card hash in `source_notices.json` |
-
-Inline source headers remain attached to the bundled code. Source license files and model-weight terms are distinct records. MiM/GL-MAE source license records, several checkpoint redistribution terms, and the complete 3DINO-derived license text remain unresolved from inspected local evidence. Public distribution should not be described as fully license-cleared until these records are resolved. No model weights are included in this repository.
+Bundled third-party code retains its original copyright and license notices. The license texts in this directory apply to their respective components. External source code and pretrained weights retain their providers' terms.

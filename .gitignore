@@ -10,6 +10,7 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.ipynb_checkpoints/
 .coverage
 .coverage.*
 htmlcov/
@@ -52,6 +53,8 @@ Thumbs.db
 *.onnx
 *.nii
 *.nii.gz
+!/notebooks/example_cases/MR/**/*.nii.gz
+/notebooks/example_cases/CT/
 *.dcm
 *.npy
 *.npz

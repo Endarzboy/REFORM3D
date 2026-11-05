@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34" fill="none" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">REFORM-3D: 3D encoder assessment</title>
+  <defs>
+    <linearGradient id="spectrum" x1="4" y1="3" x2="29" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ce4169"/>
+      <stop offset=".18" stop-color="#cf7734"/>
+      <stop offset=".34" stop-color="#a88b20"/>
+      <stop offset=".5" stop-color="#258971"/>
+      <stop offset=".67" stop-color="#347fbd"/>
+      <stop offset=".83" stop-color="#6854bd"/>
+      <stop offset="1" stop-color="#ad4c9e"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="19" y1="18" x2="31" y2="31" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#258971"/>
+      <stop offset=".4" stop-color="#347fbd"/>
+      <stop offset=".72" stop-color="#6854bd"/>
+      <stop offset="1" stop-color="#ad4c9e"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#spectrum)">
+    <path d="m15 3 11 6-11 6L4 9z" fill-opacity=".16"/>
+    <path d="m4 9 11 6v13L4 22z" fill-opacity=".08"/>
+    <path d="m15 15 11-6v13l-11 6z" fill-opacity=".13"/>
+  </g>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="m15 3 11 6-11 6L4 9zM4 9v13l11 6V15m11-6v13l-11 6M4 15l11 6 5-3" stroke="url(#spectrum)" stroke-width="1.9"/>
+    <path d="m28 27 3 3" stroke="#fff" stroke-width="4.6"/>
+    <path d="m28 27 3 3" stroke="url(#lens)" stroke-width="2.5"/>
+    <circle cx="24" cy="23" r="6.3" fill="#fff"/>
+    <circle cx="24" cy="23" r="5" fill="url(#lens)" fill-opacity=".06" stroke="url(#lens)" stroke-width="2.1"/>
+  </g>
+</svg>

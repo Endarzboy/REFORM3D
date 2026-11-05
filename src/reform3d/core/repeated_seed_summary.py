@@ -1082,7 +1082,7 @@ def collect_repeated_seed_summary(
         "checkpoints": list(checkpoints),
         "feature_types": list(feature_types),
         "acquisition_tracks": list(acquisition_tracks) if module_name == "acquisition_robustness" else None,
-        "metric_contract": "docs/reproduction.md",
+        "metric_contract": "docs/usage.md#reproducibility",
         "summary_unit": "across_repeated_full_evaluation_seeds",
         "allow_incomplete": bool(allow_incomplete),
         "n_records": len(records),

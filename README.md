@@ -1,29 +1,39 @@
-# REFORM-3D
+# <img src="docs/assets/reform3d-logo.svg" alt="" width="36" height="36"> REFORM-3D
 
 **A Representation-Centric Evaluation Framework for 3D Medical Vision Foundation Models**
 
-[![Project](https://img.shields.io/badge/Project-Page-176b5b?logo=githubpages&logoColor=white)](https://endarzboy.github.io/reform3d-website/)
-[![arXiv](https://img.shields.io/badge/arXiv-Paper-64748b?logo=arxiv&logoColor=white)](#publication)
-[![Weights](https://img.shields.io/badge/Weights-Hugging_Face-64748b?logo=huggingface)](docs/encoders.md#med3dino-checkpoints)
-[![Notebooks](https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&logoColor=white)](notebooks/visualize_PCA.ipynb)
+[Maregu Assefa](https://scholar.google.nl/citations?user=XR6wzDQAAAAJ&hl=en)<sup>1</sup>,
+[Muzammal Naseer](https://scholar.google.nl/citations?user=tM9xKA8AAAAJ&hl=en)<sup>1,2</sup>,
+[Divya Velayudhan](https://scholar.google.nl/citations?user=-ouVDccAAAAJ&hl=en)<sup>1</sup>,
+[Gedamu Alemu Kumie](https://scholar.google.nl/citations?user=dbrVI_oAAAAJ&hl=en)<sup>1</sup>,
+[Naoufel Werghi](https://scholar.google.nl/citations?user=G_2Xpm0AAAAJ&hl=en)<sup>1,*</sup>
 
-REFORM-3D helps researchers compare **frozen 3D medical encoders before downstream adaptation**. It evaluates how representations respond to voxel spacing, align anatomy across CT and MR, and support organ recognition from a few labeled examples.
+<sup>1</sup> Department of Computer Science, Khalifa University, Abu Dhabi, UAE<br>
+<sup>2</sup> University of Western Australia<br>
+<!-- <sup>*</sup> Corresponding author: [Naoufel.Werghi@ku.ac.ae](mailto:Naoufel.Werghi@ku.ac.ae) -->
+
+<a href="https://endarzboy.github.io/reform3d-website/"><img src="docs/assets/badge-project.svg" alt="Project page" height="20"></a>
+<a href="#publication"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="20"></a>
+<a href="https://huggingface.co/maregu2023/Med3DINO/tree/main"><img src="https://img.shields.io/badge/Checkpoints-Hugging_Face-ffd21e?logo=huggingface" alt="HuggingFace checkpoints" height="20"></a>
+<a href="notebooks/visualize_PCA.ipynb"><img src="https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&amp;logoColor=white" alt="Jupyter notebook" height="20"></a>
+
+REFORM-3D helps researchers compare **frozen 3D medical encoders before downstream adaptation**. It measures representation stability under voxel-spacing changes, anatomical alignment across CT and MR, and organ recognition from a few labeled examples.
 
 ![Three complementary frozen-encoder evaluation modules](docs/assets/reform3d_arch.jpg)
 
 | Module | Question | Primary metrics |
 |---|---|---|
-| Acquisition robustness | How do features change under controlled spacing changes? | Embedding drift, centered kernel alignment (CKA), matched semantic transfer |
-| Cross-modal alignment | Can an organ in CT retrieve the same anatomy in MR, and vice versa? | Bidirectional retrieval mAP, Top-1, Top-5 |
-| Anatomical generalization | How well do a few labeled examples support recognition on separate cases? | Centroid and logistic-probe balanced accuracy, adaptation gain |
+| Acquisition robustness | Are features stable and semantically useful across controlled spacing changes? | Embedding drift ↓, centered kernel alignment (CKA) ↑, matched semantic-transfer balanced accuracy ↑ |
+| Cross-modal alignment | Can CT retrieve the same organ in MR, and vice versa? | Bidirectional retrieval mAP ↑, Top-1 ↑, Top-5 ↑ |
+| Anatomical generalization | Can a few labeled examples support organ recognition on separate cases? | Centroid and logistic-probe balanced accuracy ↑, adaptation gain |
 
-The YAML workflow supports registered **Med3DINO and 3DINO** checkpoints. External encoders use dedicated adapters. The examples below use KiTS23 and MMWHS; [custom datasets](docs/data.md#custom-datasets) can be supplied through manifests. You can also [load frozen features directly](docs/encoders.md#use-frozen-features-downstream) for your own downstream pipeline.
+The examples use **KiTS23** for acquisition robustness and **MMWHS** for cross-modal alignment and anatomical generalization. This guide focuses on **Med3DINO-ISO, REL, and SA**; external encoders have dedicated adapters. Annotated CT–MR datasets can use the [custom-organ workflow](docs/usage.md#custom-datasets).
 
-Encoders remain frozen; low-shot probes learn from labeled support cases. See the [project website](https://endarzboy.github.io/reform3d-website/#findings) for selected manuscript findings.
+Encoders remain frozen throughout evaluation; low-shot probes fit labeled readouts. See the [project website](https://endarzboy.github.io/reform3d-website/#findings) for selected manuscript findings.
 
 ## Installation
 
-Use **Python 3.11 on Linux**. The supplied constraints target **PyTorch 2.4.0 with CUDA 12.1**:
+The supplied dependency constraints were validated with **Python 3.11 on Linux**, **PyTorch 2.4.0**, and **CUDA 12.1**. GPU evaluation requires a compatible NVIDIA driver.
 
 ```bash
 git clone https://github.com/Endarzboy/REFORM3D.git
@@ -33,33 +43,57 @@ source .venv/bin/activate
 python -m pip install -c requirements.txt -e .
 ```
 
-This installs the checkout in editable mode with the versions in `requirements.txt`. GPU evaluation requires a compatible NVIDIA driver.
+This installs the checkout in editable mode using the constraints in `requirements.txt`.
 
-For the bundled SAM-Med3D, MiM, and GL-MAE adapters, install `'.[external]'` instead of `.`. Other adapters may require upstream code or a separate environment; see [External encoders](docs/encoders.md#external-encoders).
+For additional encoders, follow the [adapter-specific setup instructions](docs/usage.md#external-encoders).
 
 ## Checkpoints
 
-| Encoder | YAML key | Input tensor | Backbone parameters | Weights |
+Find the three Med3DINO checkpoints in the [HuggingFace](https://huggingface.co/maregu2023/Med3DINO/tree/main). Download the selected weights locally for evaluation and PCA visualization.
+
+| Encoder | YAML key | Evaluation input | Backbone parameters | Weights |
 |---|---|---|---:|---|
-| Med3DINO-ISO | `med3dino_iso_96` | `B × 1 × 96³` | 306.78M | Hugging Face link pending |
-| Med3DINO-REL | `med3dino_rel_96` | `B × 1 × 96³` | 306.78M | Hugging Face link pending |
-| Med3DINO-SA | `med3dino_sa_96` | `B × 1 × 96³` | 306.78M | Hugging Face link pending |
-| 3DINO | `3dino` | `B × 1 × 112³` | 306.91M | Obtain upstream 3DINO weights |
+| Med3DINO-ISO | `med3dino_iso_96` | `B × 1 × 96³` | 306.78M | [Med3DINO-ISO](https://huggingface.co/maregu2023/Med3DINO/resolve/3404b24c7fb060215c15998aec6de42c7d6febc1/med3dino_iso/c96_iso_teacher_checkpoint.pth) |
+| Med3DINO-REL | `med3dino_rel_96` | `B × 1 × 96³` | 306.78M | [Med3DINO-REL](https://huggingface.co/maregu2023/Med3DINO/resolve/3404b24c7fb060215c15998aec6de42c7d6febc1/med3dino_rel/c96_rel_teacher_checkpoint.pth) |
+| Med3DINO-SA | `med3dino_sa_96` | `B × 1 × 96³` | 306.78M | [Med3DINO-SA](https://huggingface.co/maregu2023/Med3DINO/resolve/3404b24c7fb060215c15998aec6de42c7d6febc1/med3dino_sa/c96_sa_teacher_checkpoint.pth) |
 
-All four use ViT-L/16 backbones with 1,024-dimensional CLS and average-pooled patch features. ISO, REL, and SA refer to isotropic normalization, voxel-relative sampling, and spacing-aware sampling during Med3DINO pretraining.
+All three use ViT-L/16 backbones with 24 transformer blocks and 16 attention heads. Their `96³` evaluation inputs produce a `6 × 6 × 6` patch grid. CLS and average-pooled patch features (`cls` and `avg_pool`) have 1,024 dimensions. ISO, REL, and SA refer to isotropic normalization, voxel-relative sampling, and spacing-aware sampling during Med3DINO pretraining. Parameter counts include positional embeddings and mask tokens, excluding pretraining projection heads.
 
-Counts include learned positional embeddings and mask tokens, excluding pretraining projection heads. The small 96³/112³ difference comes from the stored positional grid; resizing inputs during inference does not add parameters.
+Set `checkpoint_root` to a directory with this layout, including the files for your selected encoders:
 
-Set local weights with `checkpoint_paths` or follow the [checkpoint directory layout](docs/encoders.md#med3dino-checkpoints). Med3DINO download links will be added here when published.
+```text
+checkpoints/
+├── med3dino_iso/c96_iso_teacher_checkpoint.pth
+├── med3dino_rel/c96_rel_teacher_checkpoint.pth
+└── med3dino_sa/c96_sa_teacher_checkpoint.pth
+```
+
+The download links select a fixed weight revision. [Checkpoint metadata](docs/checkpoints.json) records filenames, sizes, and SHA-256 hashes; the [Hugging Face download guide](https://huggingface.co/maregu2023/Med3DINO#download) provides CLI commands and checksum verification. Alternatively, map registry keys to explicit local files:
+
+<details>
+<summary>Configure explicit checkpoint paths</summary>
+
+```yaml
+checkpoints: [med3dino_iso_96, med3dino_rel_96, med3dino_sa_96]
+checkpoint_paths:
+  med3dino_iso_96: /path/to/iso_teacher.pth
+  med3dino_rel_96: /path/to/rel_teacher.pth
+  med3dino_sa_96: /path/to/sa_teacher.pth
+feature_types: [cls, avg_pool]
+```
+
+Paths resolve relative to the YAML file. The loader requires all backbone weights with compatible shapes and permits unused pretraining heads.
+
+</details>
 
 ## Data preparation
 
 Obtain the annotated datasets from their providers:
 
-- **KiTS23 CT:** [official download instructions](https://github.com/neheller/kits23#data-download) and [provider imaging files](https://huggingface.co/datasets/neheller/KiTS-Challenge-Imaging).
+- **KiTS23 CT:** [official download instructions](https://github.com/neheller/kits23#data-download) (`kits23_download_data`) and [provider imaging files](https://huggingface.co/datasets/neheller/KiTS-Challenge-Imaging).
 - **MMWHS CT/MR:** [official access page and agreement](https://zmiclab.github.io/zxh/0/mmwhs/), with the provider's [download folder](https://mega.nz/folder/UNMF2YYI#1cqJVzo4p_wESv9P_pc8uA).
 
-Keep data and weights outside the repository. REFORM-3D accepts these layouts:
+Keep full evaluation datasets and weights outside Git. Prepare the annotated training cohorts using these layouts:
 
 ```text
 KiTS23/
@@ -77,104 +111,154 @@ mm_whs/
     └── mr_train_1001_label.nii.gz
 ```
 
-The [data guide](docs/data.md) explains how to convert the KiTS23 per-case layout without resampling, use MMWHS `.nii` files, and prepare a complete evaluation cohort. The tree above illustrates file naming.
+These single-case entries illustrate naming; evaluation requires a complete, eligible cohort. MMWHS also accepts `.nii` files; CT and MR case IDs do not imply paired scans of the same patient.
+
+<details>
+<summary>Prepare the KiTS23 layout from the original per-case folders</summary>
+
+The provider layout contains `case_00000/imaging.nii.gz` and `case_00000/segmentation.nii.gz` under `kits23/dataset/`. Edit the two paths below and run once to create named symbolic links without resampling:
+
+```python
+from pathlib import Path
+
+source = Path("/path/to/kits23/dataset").resolve()
+target = Path("/path/to/KiTS23").resolve()
+cases = sorted(source.glob("case_*"))
+if not cases:
+    raise FileNotFoundError("No KiTS23 case directories found")
+pairs = []
+for case in cases:
+    for src_name, folder, suffix in [
+        ("imaging.nii.gz", "images", "ct"),
+        ("segmentation.nii.gz", "masks", "mask"),
+    ]:
+        src = case / src_name
+        dst = target / folder / f"{case.name}_{suffix}.nii.gz"
+        if not src.is_file():
+            raise FileNotFoundError(src)
+        if dst.exists() or dst.is_symlink():
+            raise FileExistsError(dst)
+        pairs.append((src, dst))
+for src, dst in pairs:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    dst.symlink_to(src)
+```
+
+If your data already match the expected layout, skip this step. Keep the original files in place so the links remain valid. KiTS23 semantic-target eligibility uses the complete cohort; source-bin selection happens afterward.
+
+</details>
 
 ## Evaluation
 
-Start from [mmwhs-demo.yaml](configs/mmwhs-demo.yaml) for CT–MR alignment and anatomical generalization, or [kits23-demo.yaml](configs/kits23-demo.yaml) for acquisition robustness. For example, save the following as `configs/my-mmwhs.yaml` and replace the data and weight paths:
-
-```yaml
-dataset: mmwhs_ct_mr
-data_root: /path/to/mm_whs
-checkpoint_paths:
-  med3dino_rel_96: /path/to/c96_rel_teacher_checkpoint.pth
-  med3dino_sa_96: /path/to/c96_sa_teacher_checkpoint.pth
-checkpoints: [med3dino_rel_96, med3dino_sa_96]
-workspace: ../workspace
-run_name: my-mmwhs-evaluation
-preset: demo
-seeds: [42]
-feature_types: [cls]
-device: cuda:0
-batch_size: 1
-```
-
-Relative paths resolve beside the YAML file. The `demo` preset evaluates the full selected cohort.
-
-Validate the inputs, then run:
+Copy the example configurations:
 
 ```bash
+cp configs/kits23-demo.yaml configs/my-kits23.yaml
+cp configs/mmwhs-demo.yaml configs/my-mmwhs.yaml
+```
+
+In each copy, set `data_root`, `checkpoint_root` (or `checkpoint_paths`), and `device`. Relative paths resolve beside the YAML file; `workspace: ../workspace` places artifacts at the repository's `workspace/` directory.
+
+Both examples select REL and SA, CLS features, and seed 42. The `demo` preset uses the full selected cohort. KiTS23 runs acquisition robustness; MMWHS runs both organ modules.
+
+Check the inputs, then evaluate:
+
+```bash
+reform3d check --config configs/my-kits23.yaml
+reform3d run --config configs/my-kits23.yaml
+
 reform3d check --config configs/my-mmwhs.yaml
 reform3d run --config configs/my-mmwhs.yaml
 ```
 
-`check` validates inputs and prepares the manifest without encoder inference. `run` extracts features, evaluates the selected modules, and writes reports. To compare both readouts, set `feature_types: [cls, avg_pool]`. For repeated evaluation, set `seeds: [42, 123, 456]`.
+`check` validates inputs and prepares manifests and evaluation plans without encoder inference. It also requires the selected checkpoint files to exist. `run` extracts features, evaluates the selected modules, and writes reports.
 
-Use a new `run_name` when configuration, inputs, weights, or software change. See [Usage](docs/usage.md) for configuration options and cache reuse.
+To compare all three Med3DINO variants and both main readouts over three seeds, update these fields and supply all three checkpoint files:
 
-Evaluation plans fix case selections for each module and seed, shared by all encoders and readouts. Input checksums and deterministic execution settings are recorded with each run. See [Reproducibility](docs/reproduction.md).
+```yaml
+checkpoints: [med3dino_iso_96, med3dino_rel_96, med3dino_sa_96]
+feature_types: [cls, avg_pool]
+seeds: [42, 123, 456]
+```
+
+Use a new `run_name` when configuration, inputs, weights, or software change. Evaluation plans share case selections across encoders and readouts within each module and seed. For repeatable results, keep inputs, weights, code, dependencies, hardware, and numerical settings fixed. See the [reproducibility guidance](docs/usage.md#reproducibility).
 
 ## Results and reports
 
-Open `workspace/runs/mmwhs_ct_mr/_runs/my-mmwhs-evaluation/report.html` for the combined report. Each module also has its own report and encoder outputs:
+Each run generates an HTML report, CSV scores, and JSON results. Artifacts are organized by dataset, module, seed, encoder, and readout:
 
 ```text
 workspace/
-├── manifests/mmwhs_ct_mr/
-├── cache/mmwhs_ct_mr/              # preprocessed inputs
-└── runs/mmwhs_ct_mr/
-    ├── _runs/my-mmwhs-evaluation/  # combined report and run receipt
-    ├── cross_modal/my-mmwhs-evaluation/
-    │   ├── report.html
-    │   ├── scores.csv
-    │   ├── logs/
-    │   └── seeds/seed_42/<encoder>--cls/
-    │       ├── cross_modal.json
-    │       └── features/
-    └── anatomical/my-mmwhs-evaluation/
+├── manifests/<dataset>/                    # inputs and evaluation plans
+├── cache/<dataset>/                        # preprocessed inputs
+└── runs/<dataset>/
+    ├── _runs/<run_name>/                   # combined report for multi-module runs
+    └── <module>/<run_name>/
+        ├── report.html
+        ├── scores.csv
+        ├── profile.json
+        ├── run.json
+        ├── logs/
+        └── seeds/seed_<N>/<encoder>--<readout>/
+            ├── <module>.json
+            └── features/                  # embeddings and identity metadata
 ```
 
-For KiTS23, open `workspace/runs/kits23/acquisition/<run_name>/report.html`. Reports provide sortable encoder comparisons for each readout and summarize variation across evaluation seeds. See the [output guide](docs/usage.md) for saved features, metrics, and cohort details.
+Open the module's `report.html` in a browser to compare encoders by CLS or average-pooled patch features. Tables are sortable and summarize variation across seeds. For MMWHS, `_runs/<run_name>/report.html` combines both modules. See the [output guide](docs/usage.md#reports-and-saved-outputs) for details.
 
-Rebuild a report from saved results without running inference:
+To regenerate the combined MMWHS report from saved results, use the configured run name (the example defaults to `mmwhs-demo`):
 
 ```bash
-reform3d report --run-dir workspace/runs/mmwhs_ct_mr/_runs/my-mmwhs-evaluation
+reform3d report --run-dir workspace/runs/mmwhs_ct_mr/_runs/mmwhs-demo
 ```
+
+This reads saved metrics; it does not rerun encoder inference.
+
+## Use frozen features downstream
+
+`create_feature_extractor` loads the encoder in evaluation mode with frozen parameters. Supply a preprocessed tensor with spatial axes `[D, H, W]`. The evaluation pipeline clips each source volume at its 0.05th and 99.95th intensity percentiles and scales intensities to `[-1, 1]`:
+
+```python
+import torch
+from reform3d.encoders.factory import create_feature_extractor
+
+encoder = create_feature_extractor(
+    "med3dino_sa_96",
+    checkpoint_path="/path/to/c96_sa_teacher_checkpoint.pth",
+    device="cuda:0",
+)
+# batch is your preprocessed [B, 1, 96, 96, 96] tensor.
+with torch.inference_mode():
+    features = encoder.extract(batch, normalize=True)
+    global_features = features["cls"]       # [B, 1024]
+    pooled_features = features["avg_pool"]  # [B, 1024]
+```
+
+`cls` is the global token; `avg_pool` averages the final patch tokens. `multilayer` concatenates the last four CLS vectors into `[B, 4096]`. `normalize=True` L2-normalizes embeddings, not image intensities. For evaluation comparisons, use the [configured pipeline](docs/usage.md), which applies the module's spacing, cropping, axis-order, and intensity preparation. Input shape alone does not specify physical coverage.
 
 ## PCA visualization
 
-Compare ISO, REL, and SA features on **CT and MR axial slices** using identical inputs for each encoder. The examples use KiTS23 CT and BraTS2023 FLAIR MR scans.
+The [PCA notebook](notebooks/visualize_PCA.ipynb) compares ISO, REL, and SA using a shared CT crop or full-volume MR. The [BraTS2023 FLAIR MR example and mask](notebooks/example_cases/MR/BraTS-GLI-00002-000/) are included. Download KiTS23 CT case **`case_00001`** separately using the [dataset instructions](#data-preparation).
 
-Use the self-contained [PCA notebook](notebooks/visualize_PCA.ipynb) to compare CT crop PCA and full-volume MR PCA. Image paths and settings are defined in its single runnable cell.
-
-Install the notebook tools:
+Set `checkpoint_dir` and `device`, run the shared setup cell, then run the CT or MR cell independently. Relative checkpoint paths resolve from the kernel's working directory. For CT, update the image and mask paths in `cases` to your local `case_00001` files.
 
 ```bash
 python -m pip install -c requirements.txt -e '.[notebooks]'
+jupyter lab notebooks/visualize_PCA.ipynb
 ```
-
-Open the PCA notebook and edit its image paths, optional mask paths, checkpoint directory, and device, then run its cell. It reads the scans directly and needs no visualization configuration file. CT crops follow each case's foreground. Features are extracted directly on each cell run; no feature cache is created. Example scans are not bundled. Launch notebooks with `jupyter lab`.
-
-Choose one to five axial slices and add optional ground-truth contours. MR selects the slice with the largest annotated ROI area, falling back to the image-foreground center. PCA shows feature variation rather than segmentation predictions. PCA colors are fitted independently per encoder. See the [visualization guide](docs/visualization.md) for preprocessing, feature extraction, and display controls.
 
 ## Documentation
 
-- [Data](docs/data.md): downloads, layouts, manifests, and custom datasets.
-- [Encoders](docs/encoders.md): checkpoint specifications and frozen-feature loading.
-- [Usage](docs/usage.md): configuration, caching, and reports.
-- [Visualization](docs/visualization.md): CT/MR PCA preprocessing, feature extraction, and display controls.
-- [Reproducibility](docs/reproduction.md): KiTS23/MMWHS evaluation protocols.
-- [Integrity checks](docs/usage.md#integrity-checks): required input, cache, and output checks.
+- [Usage](docs/usage.md): configuration, custom datasets, external encoders, feature reuse, reports, and reproducibility.
 
 ## Publication
 
-Paper and arXiv links will be added here when available.
+Paper and arXiv links are pending and will be added here when available.
 
-## Pretraining
+<!-- ## Pretraining
 
-The Med3DINO pretraining repository will be linked here when released. REFORM-3D includes the frozen encoder implementation needed for evaluation and feature extraction.
+The separate Med3DINO pretraining repository will be linked here when released. This repository provides frozen-encoder evaluation and feature extraction. -->
 
 ## License
 
-See [LICENSE](LICENSE) for this repository and [Source notices](docs/LICENSES/README.md) for bundled components. Dataset and weight terms remain those of their respective providers.
+REFORM-3D's own code is covered by [LICENSE](LICENSE). Med3DINO checkpoint weights are offered under **CC BY-NC 4.0**; see the [checkpoint metadata](docs/checkpoints.json). Bundled components retain their original [source notices](docs/LICENSES/README.md).

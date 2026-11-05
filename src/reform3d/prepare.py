@@ -57,7 +57,7 @@ def prepare_manifest(cfg):
         build_single_dataset_manifest(cfg['dataset'], cfg['dataset'], validate_integrity=True, seed=cfg['seeds'][0], output_dir=staging)
         payload = json.loads((staging / 'manifest_sampled.json').read_text())
     else:
-        raise ValueError('This dataset needs an explicit manifest; see docs/data.md')
+        raise ValueError('This dataset needs an explicit manifest; see docs/usage.md#custom-datasets')
     records = payload.get('samples') if 'samples' in payload else payload.get('volumes')
     if not isinstance(records, list) or not records:
         raise ValueError('Manifest contains no samples or volumes')

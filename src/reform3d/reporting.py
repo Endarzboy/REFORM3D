@@ -239,7 +239,7 @@ nav{display:flex;flex-wrap:wrap;gap:8px 22px;margin:16px 0;font-size:13px}.modul
 th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}thead th{font-size:12px;white-space:nowrap;background:var(--wash)}tbody th{font-weight:600;min-width:180px}tbody tr:last-child>*{border-bottom:0}td{white-space:nowrap}td strong{font-weight:650}.deviation{color:var(--muted);font-size:12px}code{font-size:12px;overflow-wrap:anywhere}
 .rank{color:var(--accent)}.note,.missing{color:var(--muted);font-size:13px}.warning{padding:12px 16px;border-left:3px solid #a66b24;background:#fbf1df;color:#634015}
 details{margin-top:18px}summary{cursor:pointer;color:var(--accent);font-weight:650}.metric-guide{margin-top:22px}.metric-guide h3{font-size:16px}.definitions{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 24px;margin:12px 0}.definitions dt{font-size:13px;font-weight:650}.definitions dd{margin:4px 0 0;color:var(--muted);font-size:13px}
-footer{margin-top:40px;padding-top:20px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}[hidden]{display:none!important}
+[hidden]{display:none!important}
 .scroll-hint{display:none}:focus-visible{outline:3px solid var(--accent);outline-offset:4px}@media(max-width:650px){main{padding:24px 16px}.panel{padding:14px 10px}th,td{padding:8px}.scope{padding:4px 12px}.scroll-hint{display:block;margin:10px 0 0}}
 @media print{body{background:white}main{max-width:none;padding:0}.sort-control{display:none}.table-scroll{overflow:visible}.panel{break-inside:avoid}a{color:inherit}}
 """
@@ -337,7 +337,6 @@ def write_report(run_dir, cfg, rows, status='complete'):
         parts.append('<details><summary>Missing evaluations</summary><ul>' + ''.join(
             f'<li>{_esc(row["checkpoint"])} / {_esc(row["feature"])} / {_esc(row["module"])}: {_esc(json.dumps(row["missing_seeds_by_metric"]))}</li>'
             for row in missing) + '</ul></details>')
-    parts.append(f'<footer><p>{_esc(INTERPRETATION)}</p><p>Not evaluated: {_esc(", ".join(profile["not_evaluated"]) or "none")}.</p>'
-                 '</footer></main><script>' + SCRIPT + '</script></body></html>')
+    parts.append('</main><script>' + SCRIPT + '</script></body></html>')
     (run_dir / 'report.html').write_text(''.join(parts), encoding='utf-8')
     return profile
