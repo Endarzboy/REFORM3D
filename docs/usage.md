@@ -27,7 +27,7 @@ Invalid inputs, geometry, weights, or features fail explicitly; missing results 
 
 ## Reports and saved outputs
 
-See the [output tree](../README.md#results-and-reports). Reports summarize seeds by mean and sample SD; CSV/JSON retain full precision. Multilayer tables are hidden by default. Rankings compare individual metrics; read acquisition stability alongside semantic transfer.
+Reports summarize seeds by mean and sample SD; CSV/JSON retain full precision. Multilayer tables are hidden by default. Rankings compare individual metrics; read acquisition stability alongside semantic transfer.
 
 Each encoder/readout's `features/` contains `identity.json` and `controlled_embedding_bundle.npz` (acquisition) or `organ_features.npz`. Compatible bundles share storage through hard links. `cache/<dataset>/` holds preprocessed inputs only.
 

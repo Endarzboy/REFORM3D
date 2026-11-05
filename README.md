@@ -6,11 +6,10 @@
 [Muzammal Naseer](https://scholar.google.nl/citations?user=tM9xKA8AAAAJ&hl=en)<sup>1,2</sup>,
 [Divya Velayudhan](https://scholar.google.nl/citations?user=-ouVDccAAAAJ&hl=en)<sup>1</sup>,
 [Gedamu Alemu Kumie](https://scholar.google.nl/citations?user=dbrVI_oAAAAJ&hl=en)<sup>1</sup>,
-[Naoufel Werghi](https://scholar.google.nl/citations?user=G_2Xpm0AAAAJ&hl=en)<sup>1,*</sup>
+[Naoufel Werghi](https://scholar.google.nl/citations?user=G_2Xpm0AAAAJ&hl=en)<sup>1</sup>
 
 <sup>1</sup> Department of Computer Science, Khalifa University, Abu Dhabi, UAE<br>
-<sup>2</sup> University of Western Australia<br>
-<!-- <sup>*</sup> Corresponding author: [Naoufel.Werghi@ku.ac.ae](mailto:Naoufel.Werghi@ku.ac.ae) -->
+<sup>2</sup> University of Western Australia
 
 <a href="https://endarzboy.github.io/reform3d-website/"><img src="docs/assets/badge-project.svg" alt="Project page" height="20"></a>
 <a href="#publication"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="20"></a>
@@ -27,7 +26,7 @@ REFORM-3D helps researchers compare **frozen 3D medical encoders before downstre
 | Cross-modal alignment | Can CT retrieve the same organ in MR, and vice versa? | Bidirectional retrieval mAP ↑, Top-1 ↑, Top-5 ↑ |
 | Anatomical generalization | Can a few labeled examples support organ recognition on separate cases? | Centroid and logistic-probe balanced accuracy ↑, adaptation gain |
 
-The examples use **KiTS23** for acquisition robustness and **MMWHS** for cross-modal alignment and anatomical generalization. This guide focuses on **Med3DINO-ISO, REL, and SA**; external encoders have dedicated adapters. Annotated CT–MR datasets can use the [custom-organ workflow](docs/usage.md#custom-datasets).
+The examples use **KiTS23** for acquisition robustness and **MMWHS** for cross-modal alignment and anatomical generalization, comparing **Med3DINO-ISO, REL, and SA**. Annotated CT–MR datasets can use the [custom-organ workflow](docs/usage.md#custom-datasets).
 
 Encoders remain frozen throughout evaluation; low-shot probes fit labeled readouts. See the [project website](https://endarzboy.github.io/reform3d-website/#findings) for selected manuscript findings.
 
@@ -43,13 +42,11 @@ source .venv/bin/activate
 python -m pip install -c requirements.txt -e .
 ```
 
-This installs the checkout in editable mode using the constraints in `requirements.txt`.
-
 For additional encoders, follow the [adapter-specific setup instructions](docs/usage.md#external-encoders).
 
 ## Checkpoints
 
-Find the three Med3DINO checkpoints in the [HuggingFace](https://huggingface.co/maregu2023/Med3DINO/tree/main). Download the selected weights locally for evaluation and PCA visualization.
+Download the selected Med3DINO weights from [Hugging Face](https://huggingface.co/maregu2023/Med3DINO/tree/main) for evaluation and PCA visualization.
 
 | Encoder | YAML key | Evaluation input | Backbone parameters | Weights |
 |---|---|---|---:|---|
@@ -144,7 +141,7 @@ for src, dst in pairs:
     dst.symlink_to(src)
 ```
 
-If your data already match the expected layout, skip this step. Keep the original files in place so the links remain valid. KiTS23 semantic-target eligibility uses the complete cohort; source-bin selection happens afterward.
+If your data already match the expected layout, skip this step. Keep the original files in place so the links remain valid.
 
 </details>
 
@@ -204,7 +201,7 @@ workspace/
             └── features/                  # embeddings and identity metadata
 ```
 
-Open the module's `report.html` in a browser to compare encoders by CLS or average-pooled patch features. Tables are sortable and summarize variation across seeds. For MMWHS, `_runs/<run_name>/report.html` combines both modules. See the [output guide](docs/usage.md#reports-and-saved-outputs) for details.
+Open the module's `report.html` for sortable encoder comparisons by readout, including variation across seeds. For MMWHS, `_runs/<run_name>/report.html` combines both modules.
 
 To regenerate the combined MMWHS report from saved results, use the configured run name (the example defaults to `mmwhs-demo`):
 
@@ -234,7 +231,7 @@ with torch.inference_mode():
     pooled_features = features["avg_pool"]  # [B, 1024]
 ```
 
-`cls` is the global token; `avg_pool` averages the final patch tokens. `multilayer` concatenates the last four CLS vectors into `[B, 4096]`. `normalize=True` L2-normalizes embeddings, not image intensities. For evaluation comparisons, use the [configured pipeline](docs/usage.md), which applies the module's spacing, cropping, axis-order, and intensity preparation. Input shape alone does not specify physical coverage.
+`cls` is the global token; `avg_pool` averages the final patch tokens. `multilayer` concatenates the last four CLS vectors into `[B, 4096]`. `normalize=True` L2-normalizes embeddings, not image intensities. For comparisons, use the [evaluation workflow](#evaluation) for module-specific preparation; tensor shape alone does not specify physical coverage.
 
 ## PCA visualization
 
@@ -252,12 +249,16 @@ jupyter lab notebooks/visualize_PCA.ipynb
 - [Usage](docs/usage.md): configuration, custom datasets, external encoders, feature reuse, reports, and reproducibility.
 
 ## Publication
+Please cite REFORM-3D when using the framework or Med3DINO checkpoints:
 
-Paper and arXiv links are pending and will be added here when available.
-
-<!-- ## Pretraining
-
-The separate Med3DINO pretraining repository will be linked here when released. This repository provides frozen-encoder evaluation and feature extraction. -->
+```bibtex
+@misc{assefa_reform3d,
+  title = {{REFORM-3D}: A Representation-Centric Evaluation Framework for 3D Medical Vision Foundation Models},
+  author = {Assefa, Maregu and Naseer, Muzammal and Velayudhan, Divya and Kumie, Gedamu Alemu and Werghi, Naoufel},
+  year = {2026},
+  url = {https://endarzboy.github.io/reform3d-website/}
+}
+```
 
 ## License
 
