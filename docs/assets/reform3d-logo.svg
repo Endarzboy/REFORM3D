@@ -6,10 +6,10 @@
       <stop stop-color="#178c73"/><stop offset="1" stop-color="#0b5149"/>
     </linearGradient>
     <radialGradient id="iris" cx="35%" cy="28%" r="75%">
-      <stop stop-color="#d8f5ec"/><stop offset=".45" stop-color="#6fcdb8"/><stop offset="1" stop-color="#147464"/>
+      <stop stop-color="#ffffff"/><stop offset=".5" stop-color="#e5eef0"/><stop offset="1" stop-color="#b9c9cd"/>
     </radialGradient>
   </defs>
-  <path d="M5 36C16 20 30 12 48 12s32 8 43 24C80 52 66 60 48 60S16 52 5 36Z" fill="#e8f5f0" stroke="url(#eye)" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M5 36C16 20 30 12 48 12s32 8 43 24C80 52 66 60 48 60S16 52 5 36Z" fill="#ffffff" stroke="url(#eye)" stroke-width="4" stroke-linejoin="round"/>
   <circle cx="48" cy="36" r="20" fill="url(#iris)" stroke="#0d6156" stroke-width="1.4"/>
   <path d="M48 20a16 16 0 0 1 13.86 8" fill="none" stroke="#2783bd" stroke-width="5.5" stroke-linecap="round"/>
   <path d="M61.86 44A16 16 0 0 1 48 52" fill="none" stroke="#e5a632" stroke-width="5.5" stroke-linecap="round"/>
