@@ -1,7 +1,9 @@
+# Replace the two paths with your local dataset and checkpoint directories.
 dataset: mmwhs_ct_mr
 data_root: /path/to/mm_whs
 checkpoint_root: /path/to/checkpoints
 checkpoints: [med3dino_rel_96, med3dino_sa_96]
+modules: [cross_modal, anatomical]
 workspace: ../workspace
 run_name: mmwhs-demo
 preset: demo

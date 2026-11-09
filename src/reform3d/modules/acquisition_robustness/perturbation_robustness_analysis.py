@@ -843,10 +843,7 @@ def compute_cka_between_variants(
     Returns:
         CKA matrix as nested dict
     """
-    try:
-        from .representation_geometry_analysis import cka_linear
-    except ImportError:  # pragma: no cover - direct script execution fallback
-        from representation_geometry_analysis import cka_linear
+    from reform3d.core.cka import cka_linear
 
     spacing_names = list(features_by_spacing.keys())
     cka_matrix = {name: {} for name in spacing_names}

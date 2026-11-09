@@ -12,9 +12,7 @@ __all__ = [
     "evaluation_pipeline",
     "feature_extractor",
     "retrieval_metrics",
-    "retrieval_uncertainty_analysis",
     "retrieval_diagnostics",
     "run_cross_modal_alignment",
     "single_organ_alignment",
-    "single_organ_retrieval_uncertainty",
 ]

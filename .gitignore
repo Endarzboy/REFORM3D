@@ -77,6 +77,9 @@ Thumbs.db
 /docs/retention_plan.md
 /configs/kits23.yaml
 /configs/mmwhs.yaml
+/configs/kits23-recheck.yaml
+/configs/mmwhs-anatomical-recheck.yaml
+/configs/mmwhs-cross-modal-recheck.yaml
 
 # Separately maintained project website
 /docs/reform3d-website/

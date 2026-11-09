@@ -45,7 +45,9 @@ Compare matching seeds with identical data, weights, code, dependencies, precisi
 
 ## Custom datasets
 
-Use [custom-organs.yaml](../configs/custom-organs.yaml); set `manifest` to a CSV with one row per organ:
+Use [custom-organs.yaml](../configs/custom-organs.yaml) to evaluate frozen encoders on your own annotated CT and MR data with the cross-modal and anatomical modules. It does not run acquisition robustness.
+
+Provide a CSV manifest with one row per image–organ pair:
 
 ```csv
 case_id,patient_id,modality,image,mask,organ,label_id
@@ -53,7 +55,20 @@ ct01,p01,ct,images/ct01.nii.gz,masks/ct01.nii.gz,kidney,1
 mr01,p02,mr,images/mr01.nii.gz,masks/mr01.nii.gz,kidney,1
 ```
 
-Paths resolve beside the CSV; image/mask geometry must match. Optional `patient_id` groups repeated scans for support/query separation. Defaults require at least two organs, each in five distinct cases per modality, with two support cases per modality and separate queries. The rows above illustrate formatting only.
+`label_id` identifies the organ in the mask. Image and mask paths resolve beside the CSV, and their 3D geometry must match. Use the same optional `patient_id` for repeated scans of a patient so they stay in the same split group; otherwise `case_id` is used.
+
+By default, provide at least two organs with five distinct cases per organ in each modality. Anatomical evaluation needs two support cases per organ and modality, plus case-disjoint query cases across all organs and modalities; the minimum counts alone do not guarantee a feasible split. Each organ mask must contain at least 100 voxels. The rows above illustrate the format, not a complete cohort.
+
+Copy the configuration and set `manifest`, `checkpoint_root` (or `checkpoint_paths`), and `device` for your system:
+
+```bash
+cp configs/custom-organs.yaml configs/my-organs.yaml
+# Edit configs/my-organs.yaml, then:
+reform3d check --config configs/my-organs.yaml
+reform3d run --config configs/my-organs.yaml
+```
+
+The example selects Med3DINO-REL, CLS features and seeds 42, 123 and 456. `check` validates inputs and constructs evaluation plans before feature extraction.
 
 ### Existing JSON manifests
 

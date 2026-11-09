@@ -139,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--fast-seeded-evaluation",
         action="store_true",
         help=(
-            "Skip repeated uncertainty diagnostics during seeded sweeps "
+            "Skip bootstrap intervals during seeded sweeps "
             "while keeping primary retrieval metrics for seed summaries."
         ),
     )
@@ -147,7 +147,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--skip-feature-extraction", action="store_true")
     parser.add_argument("--skip-evaluation", action="store_true")
     parser.add_argument("--skip-aggregation", action="store_true")
-    parser.add_argument("--skip-uncertainty", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--python", default=sys.executable)
     args = parser.parse_args(argv)
@@ -157,7 +156,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     checkpoints = _selected_checkpoints(args.checkpoints, args.all_checkpoints)
     feature_types = [normalize_feature_type(feature_type) for feature_type in args.feature_types]
     bootstrap_resamples = 0 if args.fast_seeded_evaluation else args.bootstrap_resamples
-    skip_uncertainty = args.skip_uncertainty or args.fast_seeded_evaluation
     uses_single_organ_alignment = _uses_single_organ_alignment(dataset_name)
     output_paths = get_output_paths(dataset_name, manifest_variant)
 
@@ -294,48 +292,6 @@ def main(argv: Sequence[str] | None = None) -> None:
                 args.dry_run,
             )
 
-    if not skip_uncertainty:
-        for feature_type in feature_types:
-            if uses_single_organ_alignment:
-                _run(
-                    _python_module_command(
-                        args.python,
-                        "reform3d.modules.cross_modal_alignment.single_organ_retrieval_uncertainty",
-                        "--analysis-name",
-                        dataset_name,
-                        "--manifest-variant",
-                        manifest_variant,
-                        "--feature-type",
-                        feature_type,
-                        "--checkpoints",
-                        *checkpoints,
-                        "--bootstrap-resamples",
-                        str(bootstrap_resamples),
-                        "--seed",
-                        str(args.seed),
-                    ),
-                    args.dry_run,
-                )
-            else:
-                _run(
-                    _python_module_command(
-                        args.python,
-                        "reform3d.modules.cross_modal_alignment.retrieval_uncertainty_analysis",
-                        "--analysis-name",
-                        dataset_name,
-                        "--manifest-variant",
-                        manifest_variant,
-                        "--feature-type",
-                        feature_type,
-                        "--checkpoints",
-                        *checkpoints,
-                        "--bootstrap-resamples",
-                        str(bootstrap_resamples),
-                        "--seed",
-                        str(args.seed),
-                    ),
-                    args.dry_run,
-                )
 
 
 if __name__ == "__main__":

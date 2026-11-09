@@ -52,22 +52,19 @@ METHOD_DEFAULT_FEATURE_TYPE = {
 }
 FEATURE_TYPES = tuple(sorted({feature_type for values in METHOD_FEATURE_TYPES.values() for feature_type in values}))
 TASK_MODULES = {
-    "acquisition-native": "native_observational",
     "acquisition-controlled": "controlled_perturbation",
     "cross-modal-extract": "cross_modal_feature_extractor",
     "cross-modal-evaluate": "cross_modal_evaluation",
     "anatomical-evaluate": "anatomical_generalization_evaluation",
 }
-ACQUISITION_TASKS = {"acquisition-native", "acquisition-controlled"}
+ACQUISITION_TASKS = {"acquisition-controlled"}
 CROSS_MODAL_TASKS = {"cross-modal-extract", "cross-modal-evaluate"}
 ANATOMICAL_TASKS = {"anatomical-evaluate"}
-ACQUISITION_NATIVE_DATASETS = ("abdomenatlas", "kits23", "totalsegmentermri")
 ACQUISITION_CONTROLLED_DATASETS = ("abdomenatlas", "kits23", "imagecas", "totalsegmentermri", "jhu_stroke")
-ACQUISITION_DATASETS = tuple(dict.fromkeys((*ACQUISITION_NATIVE_DATASETS, *ACQUISITION_CONTROLLED_DATASETS)))
+ACQUISITION_DATASETS = ACQUISITION_CONTROLLED_DATASETS
 CROSS_MODAL_DATASETS = ("totalsegmenter_ct_mr_anchor", "mmwhs_ct_mr", "amos22_ct_mr", "chaos_ct_mr")
 ANATOMICAL_DATASETS = ("totalsegmenter_ct_mr_anchor", "mmwhs_ct_mr", "amos22_ct_mr")
 DATASETS_BY_TASK = {
-    "acquisition-native": ACQUISITION_NATIVE_DATASETS,
     "acquisition-controlled": ACQUISITION_CONTROLLED_DATASETS,
     "cross-modal-extract": CROSS_MODAL_DATASETS,
     "cross-modal-evaluate": CROSS_MODAL_DATASETS,
@@ -78,10 +75,10 @@ DATASETS_BY_GROUP = {
     "cross-modal": CROSS_MODAL_DATASETS,
     "anatomical": ANATOMICAL_DATASETS,
 }
-DEVICE_TASKS = {"acquisition-native", "acquisition-controlled", "cross-modal-extract"}
-BATCH_SIZE_TASKS = {"acquisition-native", "cross-modal-extract"}
-LOG_LEVEL_TASKS = {"acquisition-native", "acquisition-controlled", "cross-modal-extract"}
-FAST_SEEDED_TASKS = {"acquisition-native", "acquisition-controlled"}
+DEVICE_TASKS = {"acquisition-controlled", "cross-modal-extract"}
+BATCH_SIZE_TASKS = {"cross-modal-extract"}
+LOG_LEVEL_TASKS = {"acquisition-controlled", "cross-modal-extract"}
+FAST_SEEDED_TASKS = {"acquisition-controlled"}
 
 
 def _unique(items: Iterable[str]) -> list[str]:
@@ -479,8 +476,6 @@ def _build_command(
 
     if task in BATCH_SIZE_TASKS and args.batch_size is not None:
         command.extend(["--batch-size", str(args.batch_size)])
-    if task == "acquisition-native" and args.num_workers is not None:
-        command.extend(["--num-workers", str(args.num_workers)])
     if task == "acquisition-controlled" and args.n_source_volumes is not None:
         command.extend(["--n-source-volumes", str(args.n_source_volumes)])
     if task in FAST_SEEDED_TASKS and args.fast_seeded_evaluation:
@@ -647,8 +642,6 @@ def _write_seed_summaries(
     summary_specs: list[tuple[str, tuple[str, ...]]] = []
     if any(task in ACQUISITION_TASKS for task in tasks):
         acquisition_tracks = []
-        if "acquisition-native" in tasks:
-            acquisition_tracks.append("native")
         if "acquisition-controlled" in tasks:
             acquisition_tracks.append("controlled")
         summary_specs.append(("acquisition_robustness", tuple(acquisition_tracks)))
@@ -691,7 +684,7 @@ def _write_seed_summaries(
                     checkpoints=[METHOD_CHECKPOINT_NAMES[method]],
                     feature_types=feature_types,
                     allow_incomplete=args.allow_incomplete_seeds,
-                    acquisition_tracks=acquisition_tracks or ("native", "controlled"),
+                    acquisition_tracks=acquisition_tracks or ("controlled",),
                     summary_subdir=summary_subdir,
                 )
                 manifest_rows.append(
@@ -754,7 +747,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--device", default=None)
     parser.add_argument("--dtype", default=None)
     parser.add_argument("--batch-size", type=int, default=None)
-    parser.add_argument("--num-workers", type=int, default=None)
     parser.add_argument("--n-source-volumes", type=int, default=None)
     parser.add_argument("--max-samples", type=int, default=None)
     parser.add_argument("--crop-cache-workers", type=int, default=None)

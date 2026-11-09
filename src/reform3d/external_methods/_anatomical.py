@@ -17,7 +17,6 @@ from reform3d.modules.anatomical_generalization.config import (
     normalize_anatomical_dataset_name,
 )
 
-
 def resolve_anatomical_manifest_path(
     dataset: str,
     manifest_path: Optional[Path],

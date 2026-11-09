@@ -1,9 +1,3 @@
-# Author: Tony Xu
-#
-# This code is adapted from the original DINOv2 repository: https://github.com/facebookresearch/dinov2
-# This code is licensed under the CC BY-NC-ND 4.0 license
-# found in the LICENSE file in the root directory of this source tree.
-
 # References:
 #   https://github.com/facebookresearch/dino/blob/main/vision_transformer.py
 #   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py

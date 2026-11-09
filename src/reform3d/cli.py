@@ -212,7 +212,8 @@ def _reports(run_dir, cfg, rows, status='complete'):
 def _acquisition_protocol(cfg, payload):
     from .modules.acquisition_robustness.config import ControlledPerturbationConfig, MRI_CONTROLLED_PERTURBATION_CONFIG
     protocol = replace(MRI_CONTROLLED_PERTURBATION_CONFIG) if payload.get('modality') == 'mr' else ControlledPerturbationConfig()
-    protocol.source_bin = cfg['source_bin']
+    if cfg['source_bin'] is not None:
+        protocol.source_bin = cfg['source_bin']
     protocol.n_source_volumes = cfg['n_source_volumes']
     return protocol
 
@@ -281,7 +282,7 @@ def _run(cfg, *, dry_run=False, execution_policy=None):
             runtime_versions[name] = None
     software = _software_hash()
     package = Path(__file__).parent
-    geometry_sources = ['encoders/med3dino/spacing_aware_transforms.py', 'modules/acquisition_robustness/data_loader.py', 'modules/acquisition_robustness/perturbation_robustness_analysis.py', 'modules/acquisition_robustness/config.py', 'modules/acquisition_robustness/semantic_labels.py', 'modules/cross_modal_alignment/feature_extractor.py']
+    geometry_sources = ['encoders/med3dino/spacing_aware_transforms.py', 'modules/acquisition_robustness/perturbation_robustness_analysis.py', 'modules/acquisition_robustness/config.py', 'modules/acquisition_robustness/semantic_labels.py', 'modules/cross_modal_alignment/feature_extractor.py']
     geometry_software = digest({'sources': {name: file_hash(package / name) for name in geometry_sources}, 'runtime': runtime_versions})
     encoder_software = digest({'sources': {str(p.relative_to(package)): file_hash(p) for p in [*sorted((package / 'encoders').rglob('*.py')), package / 'modules/acquisition_robustness/feature_extractor.py']}, 'runtime': runtime_versions})
     weights = {c.checkpoint_key: file_hash(c.path) for c in checkpoints}

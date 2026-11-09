@@ -237,12 +237,12 @@ with torch.inference_mode():
 
 The [PCA notebook](notebooks/visualize_PCA.ipynb) compares ISO, REL, and SA using a shared CT crop or full-volume MR. The [BraTS2023 FLAIR MR example and mask](notebooks/example_cases/MR/BraTS-GLI-00002-000/) are included. Download KiTS23 CT case **`case_00001`** separately using the [dataset instructions](#data-preparation).
 
-Set `checkpoint_dir` and `device`, run the shared setup cell, then run the CT or MR cell independently. Relative checkpoint paths resolve from the kernel's working directory. For CT, update the image and mask paths in `cases` to your local `case_00001` files.
+<!-- Set `checkpoint_dir` and `device`, run the shared setup cell, then run the CT or MR cell independently. Relative checkpoint paths resolve from the kernel's working directory. For CT, update the image and mask paths in `cases` to your local `case_00001` files. -->
 
-```bash
+<!-- ```bash
 python -m pip install -c requirements.txt -e '.[notebooks]'
 jupyter lab notebooks/visualize_PCA.ipynb
-```
+``` -->
 
 ## Documentation
 
@@ -252,10 +252,12 @@ jupyter lab notebooks/visualize_PCA.ipynb
 Please cite REFORM-3D when using the framework or Med3DINO checkpoints:
 
 ```bibtex
-@misc{assefa_reform3d,
-  title = {{REFORM-3D}: A Representation-Centric Evaluation Framework for 3D Medical Vision Foundation Models},
+@InProceedings{assefa_reform3d,
+  title = {REFORM-3D: A Representation-Centric Evaluation Framework for 3D Medical Vision Foundation Models},
   author = {Assefa, Maregu and Naseer, Muzammal and Velayudhan, Divya and Kumie, Gedamu Alemu and Werghi, Naoufel},
+  booktitle = {Neural Information Processing Systems (NeurIPS 2026)},
   year = {2026},
+  pages ={1--32},
   url = {https://endarzboy.github.io/reform3d-website/}
 }
 ```

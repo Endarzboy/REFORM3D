@@ -11,9 +11,8 @@ and manifest variants such as ``original_bins`` or ``coarse_bins``.
 
 from pathlib import Path
 from reform3d.core.layout import active_output_paths
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Tuple, Optional
-import os
 import hashlib
 import json
 
@@ -21,7 +20,6 @@ from reform3d.core.checkpoints import CHECKPOINTS, CheckpointConfig
 from reform3d.core.paths import (
     DOWNSTREAM_DATASET_ROOT,
     REFORM3D_DATASET_ROOT,
-    PROJECT_ROOT,
     get_reform3d_cache_root,
     get_reform3d_module_manifest_roots,
     get_reform3d_module_manifest_root,
@@ -221,145 +219,6 @@ RAW_DATASETS: Dict[str, RawDatasetConfig] = {
         is_enabled=False,
     ),
 }
-
-
-# =============================================================================
-# DOWNSTREAM DATASET REGISTRY
-# =============================================================================
-# These datasets have labels and can support spacing-stratified readout analysis.
-
-@dataclass
-class DownstreamDatasetConfig:
-    """Configuration for a preprocessed downstream dataset."""
-    name: str
-    task: str  # "segmentation" or "classification"
-    modality: str
-    num_classes: int
-    datalist_path: Path
-    data_root: Path
-    metrics_class: str  # Class name from dinov2/eval/segmentation_3d/metrics.py
-    spacing_stratifiable: bool = True  # Whether spacing stratification makes sense
-    notes: str = ""
-
-
-DOWNSTREAM_DATASETS_CONFIG: Dict[str, DownstreamDatasetConfig] = {
-    "btcv": DownstreamDatasetConfig(
-        name="btcv",
-        task="segmentation",
-        modality="ct",
-        num_classes=14,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "BTCV_100_datalist.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "BTCV",
-        metrics_class="BTCVMetrics",
-        spacing_stratifiable=True,  # UNKNOWN: Need to verify spacing distribution
-        notes="14-class abdominal CT segmentation"
-    ),
-    "brats2023": DownstreamDatasetConfig(
-        name="brats2023",
-        task="segmentation",
-        modality="mr",
-        num_classes=3,  # TC, WT, ET (multi-label)
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "BraTS_100_datalist_3dinov2.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "BraTS2023",
-        metrics_class="BraTSMetrics",
-        spacing_stratifiable=True,  # UNKNOWN: Need to verify spacing distribution
-        notes="Multi-label brain tumor segmentation (4-channel input)"
-    ),
-    "amos22": DownstreamDatasetConfig(
-        name="amos22",
-        task="segmentation",
-        modality="ct_mr",  # Both CT and MR available
-        num_classes=16,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "AMOS22_100_datalist.json",
-        data_root=DOWNSTREAM_OTHERS_ROOT / "amos22" / "amos22",
-        metrics_class="AMOS22Metrics",
-        spacing_stratifiable=True,  # CONFIRMED: Full anisotropy spectrum
-        notes="16-class abdominal segmentation, CT and MR"
-    ),
-    "isles22": DownstreamDatasetConfig(
-        name="isles22",
-        task="segmentation",
-        modality="mr",
-        num_classes=2,  # Background + lesion (binary)
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "ISLES22_100_datalist.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "ISLES22",
-        metrics_class="ISLES22Metrics",
-        spacing_stratifiable=True,  # UNKNOWN: Need to verify spacing distribution
-        notes="Binary stroke lesion segmentation (DWI/ADC)"
-    ),
-    "la_seg": DownstreamDatasetConfig(
-        name="la_seg",
-        task="segmentation",
-        modality="mr",
-        num_classes=2,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "LA-SEG_100_datalist.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "Left_Atrium",
-        metrics_class="LASEGMetrics",
-        spacing_stratifiable=True,  # UNKNOWN: Need to verify
-        notes="Binary left atrium segmentation (LGE cardiac MRI)"
-    ),
-    "tdsc_abus": DownstreamDatasetConfig(
-        name="tdsc_abus",
-        task="segmentation",
-        modality="us",  # Ultrasound
-        num_classes=2,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "TDSC-ABUS_100_datalist.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "TDSC_ABUS2023",
-        metrics_class="LASEGMetrics",  # Binary segmentation, same as LA-SEG
-        spacing_stratifiable=False,  # Ultrasound has different physics
-        notes="Binary breast tumor segmentation (automated breast ultrasound)"
-    ),
-    "kits23": DownstreamDatasetConfig(
-        name="kits23",
-        task="segmentation",
-        modality="ct",
-        num_classes=4,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "KiTS23_100_datalist_validated.json",
-        data_root=KITS23_DATA_ROOT,
-        metrics_class="KiTS23Metrics",
-        spacing_stratifiable=True,
-        notes="Kidney, renal tumor, and cyst CT segmentation"
-    ),
-    "lits": DownstreamDatasetConfig(
-        name="lits",
-        task="segmentation",
-        modality="ct",
-        num_classes=3,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "LiTS_100_datalist.json",
-        data_root=REFORM3D_DATASET_ROOT / "datasets" / "ct" / "LiTS" / "data",
-        metrics_class="LiTSMetrics",
-        spacing_stratifiable=True,
-        notes="Liver and tumor CT segmentation"
-    ),
-    "word": DownstreamDatasetConfig(
-        name="word",
-        task="segmentation",
-        modality="ct",
-        num_classes=17,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "WORD_100_datalist.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "WORD",
-        metrics_class="WORDMetrics",
-        spacing_stratifiable=True,
-        notes="Whole abdomen organ CT segmentation"
-    ),
-    "totalsegmenter_ct": DownstreamDatasetConfig(
-        name="totalsegmenter_ct",
-        task="segmentation",
-        modality="ct",
-        num_classes=105,
-        datalist_path=DOWNSTREAM_SEGMENTATION_ROOT / "TotalSegmenterCT_100_datalist.json",
-        data_root=DOWNSTREAM_SEGMENTATION_ROOT / "totalsegmenter_ct",
-        metrics_class="TotalSegmenterCTMetrics",
-        spacing_stratifiable=True,
-        notes="Whole-body CT segmentation with combined 104-organ labels"
-    ),
-}
-
-
-# =============================================================================
-# CHECKPOINT REGISTRY
-# =============================================================================
-# Shared checkpoint registry imported through the REFORM-3D core.
 
 
 # =============================================================================
@@ -966,59 +825,6 @@ class PreprocessingConfig:
 
 
 PREPROCESSING_CONFIG = PreprocessingConfig()
-
-
-# =============================================================================
-# FEATURE EXTRACTION CONFIGURATION
-# =============================================================================
-
-@dataclass
-class FeatureExtractionConfig:
-    """Configuration for feature extraction from ViT encoder."""
-    # Global representation methods
-    use_cls_token: bool = True
-    use_avg_pooled_patches: bool = True  # Aggregate patch tokens via spatial average pooling
-
-    # Multi-scale analysis
-    use_multilayer: bool = True
-    layer_indices: Tuple[int, ...] = (-4, -3, -2, -1)  # Last 4 blocks
-
-    # Patch tokens (for CKA on local representations)
-    extract_patch_tokens: bool = True
-
-    # Batch processing
-    batch_size: int = 4
-    num_workers: int = 4
-
-    # Output format
-    save_format: str = "pt"  # "pt" (PyTorch) or "npy" (NumPy)
-
-
-FEATURE_EXTRACTION_CONFIG = FeatureExtractionConfig()
-
-
-# =============================================================================
-# METRICS CONFIGURATION
-# =============================================================================
-# Metrics for readout evaluation.
-
-@dataclass
-class MetricsConfig:
-    """Configuration for evaluation metrics."""
-    # Segmentation metrics
-    compute_dice: bool = True
-    compute_hd95: bool = True
-    compute_asd: bool = True
-    compute_nsd: bool = True
-    nsd_tolerance_mm: float = 2.0
-
-    # Classification metrics (if applicable)
-    compute_accuracy: bool = True
-    compute_auroc: bool = True
-    compute_f1: bool = True
-
-
-METRICS_CONFIG = MetricsConfig()
 
 
 # =============================================================================

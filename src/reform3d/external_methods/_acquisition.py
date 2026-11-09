@@ -1,41 +1,29 @@
 """Acquisition Robustness helpers for external baseline methods.
 
 The functions in this module let an external feature extractor participate in
-the same native-spacing and controlled-perturbation analyses used by the main
+the controlled-perturbation analysis used by the main
 Acquisition Robustness module.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, Callable, Dict, Optional
 
-import numpy as np
 import torch
-from tqdm import tqdm
 
 from reform3d.modules.acquisition_robustness.config import (
     DEFAULT_MANIFEST_VARIANT,
     get_acquisition_manifest_path,
-    get_bin_name_map,
-    get_binning_scheme_from_manifest,
     get_cache_root,
-    get_checkpoint_feature_dir,
     get_controlled_perturbation_config_from_manifest,
     get_dataset_name_from_manifest_path,
     get_manifest_variant_from_manifest_path,
     get_output_paths,
 )
-from reform3d.modules.acquisition_robustness.data_loader import (
-    create_acquisition_dataloader,
-    warmup_observational_cache,
-)
-from reform3d.modules.acquisition_robustness.evaluation_pipeline import write_results_catalog
 from reform3d.modules.acquisition_robustness.perturbation_robustness_analysis import (
     _load_matched_semantic_targets,
     _resolve_controlled_dirs,
@@ -48,16 +36,6 @@ from reform3d.modules.acquisition_robustness.perturbation_robustness_analysis im
     run_matched_semantic_transfer,
     save_controlled_embedding_bundle,
 )
-from reform3d.modules.acquisition_robustness.representation_geometry_analysis import (
-    run_representation_geometry_analysis,
-)
-from reform3d.modules.acquisition_robustness.semantic_analysis import (
-    run_multilabel_cross_bin_transfer,
-    run_semantic_probing,
-    serialize_spacing_regression_results,
-    spacing_regression_probe,
-)
-from reform3d.modules.acquisition_robustness.semantic_labels import compute_semantic_task_labels
 
 
 logger = logging.getLogger(__name__)
@@ -76,44 +54,6 @@ ACQUISITION_DATASET_ALIASES = {
 }
 
 
-class NativeObservationalFeatureRunner:
-    """Extract one feature family from a native-spacing dataloader."""
-
-    def __init__(
-        self,
-        extractor: Any,
-        feature_type: str,
-        batch_transform: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
-    ) -> None:
-        self.extractor = extractor
-        self.feature_type = feature_type
-        self.batch_transform = batch_transform
-        self.config = getattr(extractor, "config", SimpleNamespace(device="cpu", dtype=torch.float32))
-
-    def extract_from_dataloader(self, dataloader, show_progress: bool = True) -> Dict[str, np.ndarray]:
-        all_features = []
-        iterator = tqdm(dataloader, desc="Extracting observational features") if show_progress else dataloader
-
-        for batch in iterator:
-            if isinstance(batch, dict):
-                x = batch["image"]
-            elif isinstance(batch, (list, tuple)):
-                x = batch[0]
-            else:
-                x = batch
-
-            if self.batch_transform is not None:
-                x = self.batch_transform(x)
-
-            x = x.to(device=self.config.device, dtype=self.config.dtype, non_blocking=True)
-            with torch.inference_mode():
-                try:
-                    features = self.extractor.extract(x, normalize=True)
-                except TypeError:
-                    features = self.extractor.extract(x)
-            all_features.append(features[self.feature_type].detach().cpu().numpy())
-
-        return {self.feature_type: np.concatenate(all_features, axis=0)}
 
 
 def normalize_acquisition_dataset_name(dataset_name: str) -> str:
@@ -142,7 +82,6 @@ def resolve_acquisition_manifest_path(
         raise FileNotFoundError(_missing_manifest_message(resolved))
     return resolved
 
-
 def _missing_manifest_message(manifest_path: Path) -> str:
     return (
         f"Manifest not found: {manifest_path}. "
@@ -151,18 +90,9 @@ def _missing_manifest_message(manifest_path: Path) -> str:
         "so missing manifests are prepared before evaluation."
     )
 
-
-def _feature_cache_path(features_dir: Path, checkpoint_name: str, feature_type: str, manifest_path: Path) -> Path:
-    manifest_hash = hashlib.md5(manifest_path.read_bytes()).hexdigest()[:8]
-    cache_dir = get_checkpoint_feature_dir(features_dir, checkpoint_name, feature_type)
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / f"native_features_{manifest_hash}.npz"
-
-
 def _load_manifest_payload(manifest_path: Path) -> Dict[str, Any]:
     with Path(manifest_path).open("r", encoding="utf-8") as handle:
         return json.load(handle)
-
 
 def _safe_compute_cka(features_by_spacing: Dict[str, Any]) -> Dict[str, Dict[str, Optional[float]]]:
     spacing_names = list(features_by_spacing.keys())
@@ -184,213 +114,6 @@ def _safe_compute_cka(features_by_spacing: Dict[str, Any]) -> Dict[str, Dict[str
             else:
                 sanitized[spacing_name][other_name] = float(value)
     return sanitized
-
-
-def _compute_semantic_targets(
-    manifest_path: Path,
-    file_paths: list[str],
-    transfer_dataset: str,
-    features_dir: Path,
-    semantic_label_workers: int,
-    semantic_cache_flush_every: int,
-) -> tuple[Optional[np.ndarray], Optional[Dict[str, Any]], Optional[list[str]]]:
-    try:
-        semantic_labels_full, semantic_paths, semantic_meta = compute_semantic_task_labels(
-            manifest_path,
-            mode="multi_binary",
-            filter_dataset=transfer_dataset,
-            cache_dir=features_dir,
-            num_workers=semantic_label_workers,
-            cache_flush_every=semantic_cache_flush_every,
-        )
-    except Exception as exc:
-        raise RuntimeError(f"Semantic label extraction failed for {manifest_path}: {exc}") from exc
-
-    if semantic_labels_full.ndim != 2 or semantic_labels_full.shape[1] == 0:
-        return None, semantic_meta, semantic_meta.get("organ_names", [])
-
-    semantic_path_to_index = {path: idx for idx, path in enumerate(semantic_paths)}
-    semantic_labels = np.zeros((len(file_paths), semantic_labels_full.shape[1]), dtype=np.int32)
-    for sample_index, file_path in enumerate(file_paths):
-        if file_path in semantic_path_to_index:
-            semantic_labels[sample_index] = semantic_labels_full[semantic_path_to_index[file_path]]
-
-    return semantic_labels, semantic_meta, semantic_meta.get("organ_names", [])
-
-
-def run_native_observational_analysis(
-    *,
-    manifest_path: Path,
-    checkpoint_name: str,
-    feature_type: str,
-    extractor: Any,
-    batch_transform: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
-    analysis_name: Optional[str] = None,
-    batch_size: int = 4,
-    num_workers: int = 2,
-    cache_features: bool = True,
-    warmup_cache: bool = True,
-    semantic_label_workers: int = 2,
-    semantic_cache_flush_every: int = 128,
-    fast_seeded_evaluation: bool = False,
-) -> Dict[str, Any]:
-    """Run native-spacing Acquisition Robustness analyses for an external method."""
-
-    manifest_path = Path(manifest_path)
-    if not manifest_path.exists():
-        raise FileNotFoundError(_missing_manifest_message(manifest_path))
-
-    dataset_name = analysis_name or get_dataset_name_from_manifest_path(manifest_path)
-    manifest_variant = get_manifest_variant_from_manifest_path(manifest_path)
-    output_paths = get_output_paths(dataset_name, manifest_variant)
-    results_dir = output_paths["results"]
-    figures_dir = output_paths["figures"]
-    features_dir = output_paths["features"]
-    results_dir.mkdir(parents=True, exist_ok=True)
-    figures_dir.mkdir(parents=True, exist_ok=True)
-    features_dir.mkdir(parents=True, exist_ok=True)
-
-    manifest_payload = _load_manifest_payload(manifest_path)
-    volumes = manifest_payload["volumes"]
-    file_paths = [volume["file_path"] for volume in volumes]
-    bin_labels = np.asarray([volume["anisotropy_bin"] for volume in volumes])
-    anisotropy_ratios = np.asarray([volume.get("anisotropy_ratio", 1.0) for volume in volumes], dtype=np.float32)
-    dataset_counts: Dict[str, int] = {}
-    for volume in volumes:
-        dataset_counts[volume["dataset"]] = dataset_counts.get(volume["dataset"], 0) + 1
-    transfer_dataset = max(dataset_counts.items(), key=lambda item: item[1])[0]
-    binning_scheme = get_binning_scheme_from_manifest(manifest_payload)
-    bin_names = get_bin_name_map(binning_scheme)
-
-    crop_size = int(getattr(extractor.config, "crop_size", getattr(extractor.config, "input_size", 96)))
-    if warmup_cache:
-        warmup_observational_cache(
-            manifest_path=manifest_path,
-            crop_size=crop_size,
-            batch_size=batch_size,
-            num_workers=num_workers,
-        )
-
-    feature_cache_path = _feature_cache_path(features_dir, checkpoint_name, feature_type, manifest_path)
-    features = None
-    if cache_features and feature_cache_path.exists():
-        cached = np.load(feature_cache_path)
-        if len(cached["features"]) == len(volumes):
-            features = cached["features"]
-
-    if features is None:
-        dataloader = create_acquisition_dataloader(
-            manifest_path=manifest_path,
-            crop_size=crop_size,
-            batch_size=batch_size,
-            num_workers=num_workers,
-            persistent_workers=False,
-            prefetch_factor=1 if num_workers > 0 else None,
-        )
-        feature_runner = NativeObservationalFeatureRunner(
-            extractor=extractor,
-            feature_type=feature_type,
-            batch_transform=batch_transform,
-        )
-        features = feature_runner.extract_from_dataloader(dataloader, show_progress=True)[feature_type]
-        if cache_features:
-            np.savez_compressed(feature_cache_path, features=features, bin_labels=bin_labels, file_paths=file_paths)
-
-    geometry = run_representation_geometry_analysis(
-        features=features,
-        bin_labels=bin_labels,
-        checkpoint_name=checkpoint_name,
-        feature_type=feature_type,
-        compute_tsne=not fast_seeded_evaluation,
-        output_dir=results_dir,
-        figures_dir=figures_dir,
-        bin_names=bin_names,
-        binning_scheme=binning_scheme,
-        dataset_name=dataset_name,
-        manifest_variant=manifest_variant,
-        compute_distribution_metrics=not fast_seeded_evaluation,
-        compute_embedding_geometry_metrics=not fast_seeded_evaluation,
-        compute_balanced_sensitivity=not fast_seeded_evaluation,
-    )
-
-    spacing_regression = spacing_regression_probe(
-        features=features,
-        anisotropy_ratios=anisotropy_ratios,
-        bin_labels=bin_labels,
-    )
-    checkpoint_results_dir = get_checkpoint_feature_dir(results_dir, checkpoint_name, feature_type)
-    checkpoint_results_dir.mkdir(parents=True, exist_ok=True)
-    with (checkpoint_results_dir / "anisotropy_regression.json").open("w", encoding="utf-8") as handle:
-        json.dump(
-            {
-                "checkpoint": checkpoint_name,
-                "feature_type": feature_type,
-                "task_name": "anisotropy_regression",
-                "binning_scheme": binning_scheme,
-                "anisotropy_regression": serialize_spacing_regression_results(spacing_regression),
-                "spacing_regression": serialize_spacing_regression_results(spacing_regression),
-            },
-            handle,
-            indent=2,
-        )
-
-    semantic_labels, semantic_meta, label_names = _compute_semantic_targets(
-        manifest_path=manifest_path,
-        file_paths=file_paths,
-        transfer_dataset=transfer_dataset,
-        features_dir=features_dir,
-        semantic_label_workers=semantic_label_workers,
-        semantic_cache_flush_every=semantic_cache_flush_every,
-    )
-
-    semantic_probe = None
-    semantic_transfer = None
-    if semantic_labels is not None and label_names:
-        transfer_mask = np.asarray([volume["dataset"] == transfer_dataset for volume in volumes])
-        if int(transfer_mask.sum()) > 50:
-            semantic_probe = run_semantic_probing(
-                features=features[transfer_mask],
-                bin_labels=bin_labels[transfer_mask],
-                semantic_labels=semantic_labels[transfer_mask],
-                checkpoint_name=checkpoint_name,
-                feature_type=feature_type,
-                label_names=label_names,
-                anisotropy_ratios=anisotropy_ratios[transfer_mask],
-                output_dir=results_dir,
-                analysis_name=dataset_name,
-                manifest_variant=manifest_variant,
-            )
-            semantic_transfer = run_multilabel_cross_bin_transfer(
-                features=features[transfer_mask],
-                bin_labels=bin_labels[transfer_mask],
-                semantic_labels=semantic_labels[transfer_mask],
-                checkpoint_name=checkpoint_name,
-                feature_type=feature_type,
-                dataset=transfer_dataset,
-                output_dir=results_dir,
-                analysis_name=dataset_name,
-                manifest_variant=manifest_variant,
-            )
-
-    write_results_catalog(results_dir, dataset_name, manifest_path)
-    summary = {
-        "checkpoint": checkpoint_name,
-        "feature_type": feature_type,
-        "dataset_name": dataset_name,
-        "manifest_variant": manifest_variant,
-        "transfer_dataset": transfer_dataset,
-        "representation_geometry": {
-            "mean_cross_cka": geometry.cka_stats["mean_cross_cka"],
-            "mean_mmd_rbf": geometry.observational_distances["summary"]["mean_mmd_rbf"],
-            "mean_sliced_wasserstein": geometry.observational_distances["summary"]["mean_sliced_wasserstein"],
-        },
-        "semantic_transfer": semantic_transfer.cross_bin_accuracy if semantic_transfer is not None else None,
-        "semantic_probing": semantic_probe.mean_balanced_accuracy if semantic_probe is not None else None,
-    }
-    if semantic_meta is not None:
-        summary["semantic_label_count"] = len(label_names or [])
-    return summary
-
 
 def run_controlled_perturbation_analysis(
     *,

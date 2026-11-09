@@ -1,10 +1,13 @@
+# Replace the two paths with your local dataset and checkpoint directories.
 dataset: kits23
 data_root: /path/to/KiTS23
 checkpoint_root: /path/to/checkpoints
 checkpoints: [med3dino_rel_96, med3dino_sa_96]
+modules: [acquisition]
 workspace: ../workspace
 run_name: kits23-demo
 preset: demo
+source_bin: 0
 seeds: [42]
 feature_types: [cls]
 device: cuda:0
