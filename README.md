@@ -1,20 +1,23 @@
-# <img src="docs/assets/reform3d-logo.svg" alt="" width="36" height="36"> REFORM-3D
+<div align="center">
+  <h1 align="center"><img src="docs/assets/reform3d-logo.svg" alt="" width="44" height="44"> REFORM-3D</h1>
+  <h2 align="center">A Representation-Centric Evaluation Framework for<br>3D Medical Vision Foundation Models</h2>
+  <p align="center">
+    <a href="https://scholar.google.nl/citations?user=XR6wzDQAAAAJ&amp;hl=en">Maregu Assefa</a><sup>1</sup>,
+    <a href="https://scholar.google.nl/citations?user=tM9xKA8AAAAJ&amp;hl=en">Muzammal Naseer</a><sup>1,2</sup>,
+    <a href="https://scholar.google.nl/citations?user=-ouVDccAAAAJ&amp;hl=en">Divya Velayudhan</a><sup>1</sup>,
+    <a href="https://scholar.google.nl/citations?user=dbrVI_oAAAAJ&amp;hl=en">Gedamu Alemu Kumie</a><sup>1</sup>,
+    <a href="https://scholar.google.nl/citations?user=G_2Xpm0AAAAJ&amp;hl=en">Naoufel Werghi</a><sup>1</sup>
+  </p>
+  <p align="center"><sup>1</sup> Department of Computer Science, Khalifa University, Abu Dhabi, UAE<br>
+  <sup>2</sup> University of Western Australia</p>
+</div>
 
-**A Representation-Centric Evaluation Framework for 3D Medical Vision Foundation Models**
-
-[Maregu Assefa](https://scholar.google.nl/citations?user=XR6wzDQAAAAJ&hl=en)<sup>1</sup>,
-[Muzammal Naseer](https://scholar.google.nl/citations?user=tM9xKA8AAAAJ&hl=en)<sup>1,2</sup>,
-[Divya Velayudhan](https://scholar.google.nl/citations?user=-ouVDccAAAAJ&hl=en)<sup>1</sup>,
-[Gedamu Alemu Kumie](https://scholar.google.nl/citations?user=dbrVI_oAAAAJ&hl=en)<sup>1</sup>,
-[Naoufel Werghi](https://scholar.google.nl/citations?user=G_2Xpm0AAAAJ&hl=en)<sup>1</sup>
-
-<sup>1</sup> Department of Computer Science, Khalifa University, Abu Dhabi, UAE<br>
-<sup>2</sup> University of Western Australia
-
-<a href="https://endarzboy.github.io/reform3d-website/"><img src="docs/assets/badge-project.svg" alt="Project page" height="20"></a>
-<a href="#publication"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="20"></a>
-<a href="https://huggingface.co/maregu2023/Med3DINO/tree/main"><img src="https://img.shields.io/badge/Checkpoints-Hugging_Face-ffd21e?logo=huggingface" alt="HuggingFace checkpoints" height="20"></a>
-<a href="notebooks/visualize_PCA.ipynb"><img src="https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&amp;logoColor=white" alt="Jupyter notebook" height="20"></a>
+<p align="center">
+<a href="https://endarzboy.github.io/reform3d-website/"><img src="docs/assets/badge-project.svg" alt="Project Page" height="24"></a>
+<a href="#publication"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="24"></a>
+<a href="https://huggingface.co/maregu2023/Med3DINO/tree/main"><img src="https://img.shields.io/badge/Checkpoints-Hugging_Face-ffd21e?logo=huggingface" alt="HuggingFace checkpoints" height="24"></a>
+<a href="notebooks/visualize_PCA.ipynb"><img src="https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&amp;logoColor=white" alt="Jupyter notebook" height="24"></a>
+</p>
 
 REFORM-3D helps researchers compare **frozen 3D medical encoders before downstream adaptation**. It measures representation stability under voxel-spacing changes, anatomical alignment across CT and MR, and organ recognition from a few labeled examples.
 
