@@ -15,7 +15,7 @@
 <p align="center">
 <a href="https://endarzboy.github.io/reform3d-website/"><img src="docs/assets/badge-project.svg" alt="Project Page" height="24"></a>
 <a href="#publication"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="24"></a>
-<a href="https://huggingface.co/maregu2023/Med3DINO/tree/main"><img src="https://img.shields.io/badge/Checkpoints-Hugging_Face-ffd21e?logo=huggingface" alt="HuggingFace checkpoints" height="24"></a>
+<a href="https://huggingface.co/maregu2023/Med3DINO"><img src="https://img.shields.io/badge/Checkpoints-Hugging_Face-ffd21e?logo=huggingface" alt="HuggingFace checkpoints" height="24"></a>
 <a href="notebooks/visualize_PCA.ipynb"><img src="https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&amp;logoColor=white" alt="Jupyter notebook" height="24"></a>
 </p>
 
