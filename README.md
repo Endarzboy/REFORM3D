@@ -14,7 +14,7 @@
 
 <p align="center">
 <a href="https://endarzboy.github.io/reform3d-website/"><img src="docs/assets/badge-project.svg" alt="Project Page" height="24"></a>
-<a href="#publication"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="24"></a>
+<a href="https://arxiv.org/abs/2611.10062"><img src="docs/assets/badge-arxiv.svg" alt="arXiv Paper" height="24"></a>
 <a href="https://huggingface.co/maregu2023/Med3DINO"><img src="https://img.shields.io/badge/Checkpoints-Hugging_Face-ffd21e?logo=huggingface" alt="HuggingFace checkpoints" height="24"></a>
 <a href="notebooks/visualize_PCA.ipynb"><img src="https://img.shields.io/badge/Examples-Jupyter-f37626?logo=jupyter&amp;logoColor=white" alt="Jupyter notebook" height="24"></a>
 </p>
@@ -261,7 +261,7 @@ Please cite REFORM-3D when using the framework or Med3DINO checkpoints:
   booktitle = {Neural Information Processing Systems (NeurIPS 2026)},
   year = {2026},
   pages ={1--32},
-  url = {https://endarzboy.github.io/reform3d-website/}
+  url = {https://arxiv.org/abs/2611.10062}
 }
 ```
 
