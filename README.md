@@ -1,5 +1,5 @@
 <div align="center">
-  <h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/reform3d-wordmark-dark.svg"><img src="docs/assets/reform3d-wordmark-light.svg" alt="REFORM-3D" width="260" height="50"></picture></h1>
+  <h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/reform3d-wordmark-dark.svg"><img src="docs/assets/reform3d-wordmark-light.svg" alt="REFORM-3D" width="310" height="60"></picture></h1>
   <h2 align="center">A Representation-Centric Evaluation Framework for<br>3D Medical Vision Foundation Models</h2>
   <p align="center">
     <a href="https://scholar.google.nl/citations?user=XR6wzDQAAAAJ&amp;hl=en">Maregu Assefa</a><sup>1</sup>,

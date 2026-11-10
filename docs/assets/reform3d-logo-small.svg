@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 168" role="img" aria-labelledby="reform3d-title reform3d-description">
+  <title id="reform3d-title">REFORM-3D</title>
+  <desc id="reform3d-description">Three open isometric planes frame a stable central cube. The jade plane represents acquisition robustness, muted coral represents cross-modal alignment, and warm gold represents anatomical generalization. The core represents the frozen 3D encoder under evaluation. The background and gaps are transparent.</desc>
+  <g>
+    <path d="M56.220 63.605L27.449 47.000L80.000 16.660L132.551 47.000L103.780 63.605" fill="none" stroke="#218D7B" stroke-width="10" stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M109.553 73.603L138.318 56.990L138.318 117.670L85.768 148.010L85.773 114.792" fill="none" stroke="#AE741A" stroke-width="10" stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M74.227 114.792L74.232 148.010L21.682 117.670L21.682 56.990L50.447 73.603" fill="none" stroke="#C77B6B" stroke-width="10" stroke-linejoin="round" stroke-linecap="butt"/>
+    <g transform="translate(-13.6 -14.28) scale(1.17)">
+    <path d="M80.000 58.975L100.828 71.000L80.000 83.025L59.172 71.000Z" fill="#397B7B"/>
+    <path d="M58.328 72.463L79.156 84.487L79.156 108.537L58.328 96.513Z" fill="#245A60"/>
+    <path d="M80.844 84.487L101.672 72.463L101.672 96.513L80.844 108.537Z" fill="#173D46"/>
+    </g>
+  </g>
+</svg>

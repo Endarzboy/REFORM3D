@@ -1,23 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 72" role="img" aria-labelledby="title desc">
-  <title id="title">REFORM-3D</title>
-  <desc id="desc">Three overlapping lenses inside an eye represent complementary evaluation perspectives.</desc>
-  <defs>
-    <linearGradient id="eye" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#178c73"/><stop offset="1" stop-color="#0b5149"/>
-    </linearGradient>
-    <linearGradient id="eye-fill" x1="0" y1="0" x2="0" y2="1">
-      <stop stop-color="#6f7372"/><stop offset="1" stop-color="#f0f5f4"/>
-    </linearGradient>
-    <radialGradient id="halo">
-      <stop stop-color="#c7dbd8" stop-opacity=".72"/>
-      <stop offset=".65" stop-color="#dce9e5" stop-opacity=".42"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <path d="M5 36C16 20 30 12 48 12s32 8 43 24C80 52 66 60 48 60S16 52 5 36Z" fill="url(#eye-fill)" stroke="url(#eye)" stroke-width="4" stroke-linejoin="round"/>
-  <circle cx="48" cy="36" r="23" fill="url(#halo)"/>
-  <path d="M38 19C30 24 28 30 28 36s2 12 10 17c8-5 10-11 10-17s-2-12-10-17Z" fill="#158d70" fill-opacity=".66" stroke="#0e7860" stroke-width="1.2"/>
-  <path d="M48 19C40 24 38 30 38 36s2 12 10 17c8-5 10-11 10-17s-2-12-10-17Z" fill="#bd4b48" fill-opacity=".66" stroke="#a83f40" stroke-width="1.2"/>
-  <path d="M58 19C50 24 48 30 48 36s2 12 10 17c8-5 10-11 10-17s-2-12-10-17Z" fill="#e5a632" fill-opacity=".7" stroke="#bd7a12" stroke-width="1.2"/>
-  <path d="M35 23c-3 4-4 8-4 13M45 23c-3 4-4 8-4 13M55 23c-3 4-4 8-4 13" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1" stroke-linecap="round"/>
+<?xml version='1.0' encoding='UTF-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 168" role="img" aria-labelledby="reform3d-title reform3d-description">
+  <title id="reform3d-title">REFORM-3D</title>
+  <desc id="reform3d-description">Three open isometric planes frame a stable central cube. The jade plane represents acquisition robustness, muted coral represents cross-modal alignment, and warm gold represents anatomical generalization. The core represents the frozen 3D encoder under evaluation. The background and gaps are transparent.</desc>
+  <g>
+    <path d="M56.220 63.605L27.449 47.000L80.000 16.660L132.551 47.000L103.780 63.605" fill="none" stroke="#218D7B" stroke-width="8" stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M109.553 73.603L138.318 56.990L138.318 117.670L85.768 148.010L85.773 114.792" fill="none" stroke="#AE741A" stroke-width="8" stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M74.227 114.792L74.232 148.010L21.682 117.670L21.682 56.990L50.447 73.603" fill="none" stroke="#C77B6B" stroke-width="8" stroke-linejoin="round" stroke-linecap="butt"/>
+    <path d="M80.000 58.975L100.828 71.000L80.000 83.025L59.172 71.000Z" fill="#397B7B"/>
+    <path d="M58.328 72.463L79.156 84.487L79.156 108.537L58.328 96.513Z" fill="#245A60"/>
+    <path d="M80.844 84.487L101.672 72.463L101.672 96.513L80.844 108.537Z" fill="#173D46"/>
+  </g>
 </svg>
